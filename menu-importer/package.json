@@ -1,0 +1,27 @@
+{
+  "name": "menu-importer",
+  "version": "1.0.0",
+  "license": "UNLICENSED",
+  "scripts": {
+    "shopify": "shopify",
+    "build": "shopify app build",
+    "dev": "shopify app dev",
+    "info": "shopify app info",
+    "generate": "shopify app generate",
+    "deploy": "shopify app deploy"
+  },
+  "trustedDependencies": [
+    "@shopify/plugin-cloudflare"
+  ],
+  "author": "0125024",
+  "private": true,
+  "description": "This is a template for building an [extension-only Shopify app](https://shopify.dev/docs/apps/build/app-extensions/build-extension-only-app). It contains the basics for building a Shopify app that uses only app extensions.",
+  "main": ".graphqlrc.js",
+  "keywords": [],
+  "type": "commonjs",
+  "dependencies": {
+    "csv-parser": "^3.0.0",
+    "dotenv": "^16.6.1",
+    "node-fetch": "^2.6.7"
+  }
+}

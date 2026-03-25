@@ -1,0 +1,156 @@
+import requests
+import pandas as pd
+import time
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+SHOP  = os.getenv("SHOP_NAME")
+TOKEN = os.getenv("SHOPIFY_ACCESS_TOKEN_IMPORT_PRODUCT")
+print(f"SHOP: {SHOP}")
+print(f"TOKEN: {TOKEN[:10]}..." if TOKEN else "TOKEN: None")
+
+HEADERS = {"Content-Type": "application/json", "X-Shopify-Access-Token": TOKEN}
+API_URL = f"https://{SHOP}/admin/api/2025-01/graphql.json"
+
+
+# ── Resolve SKU → Product GID ─────────────────────────────────
+def get_product_gids_by_skus(skus, batch_size=50):
+    gid_map = {}
+    for i in range(0, len(skus), batch_size):
+        batch = skus[i:i+batch_size]
+        aliases = "\n".join([
+            f'p{j}: productVariants(first: 1, query: "sku:{sku}") {{ edges {{ node {{ product {{ id }} }} }} }}'
+            for j, sku in enumerate(batch)
+        ])
+        res  = requests.post(API_URL, json={"query": f"{{ {aliases} }}"}, headers=HEADERS)
+        data = res.json().get("data", {})
+        for j, sku in enumerate(batch):
+            edges = data.get(f"p{j}", {}).get("edges", [])
+            gid_map[sku] = edges[0]["node"]["product"]["id"] if edges else None
+        print(f"  Resolved {min(i+batch_size, len(skus))}/{len(skus)} SKUs")
+        time.sleep(0.5)
+    return gid_map
+
+
+# ── Get existing media IDs for a product ─────────────────────
+def get_media_ids(product_gid):
+    query = """
+    query getMedia($id: ID!) {
+      product(id: $id) {
+        media(first: 50) {
+          edges { node { id } }
+        }
+      }
+    }"""
+    res  = requests.post(API_URL, json={"query": query, "variables": {"id": product_gid}}, headers=HEADERS)
+    data = res.json().get("data", {})
+    edges = data.get("product", {}).get("media", {}).get("edges", [])
+    return [e["node"]["id"] for e in edges]
+
+
+# ── Delete all existing media ─────────────────────────────────
+def delete_media(product_gid, media_ids):
+    if not media_ids:
+        return
+    mutation = """
+    mutation deleteMedia($productId: ID!, $mediaIds: [ID!]!) {
+      productDeleteMedia(productId: $productId, mediaIds: $mediaIds) {
+        deletedMediaIds
+        userErrors { field message }
+      }
+    }"""
+    res  = requests.post(API_URL, json={
+        "query": mutation,
+        "variables": {"productId": product_gid, "mediaIds": media_ids}
+    }, headers=HEADERS)
+    result = res.json().get("data", {}).get("productDeleteMedia", {})
+    if result.get("userErrors"):
+        print(f"  ⚠️ Delete errors: {result['userErrors']}")
+    else:
+        print(f"  🗑️ Deleted {len(result.get('deletedMediaIds', []))} media")
+
+
+# ── Create new media ──────────────────────────────────────────
+def create_media(product_gid, image_urls):
+    media_input = [
+        {"originalSource": url, "mediaContentType": "IMAGE"}
+        for url in image_urls
+    ]
+    mutation = """
+    mutation createMedia($productId: ID!, $media: [CreateMediaInput!]!) {
+      productCreateMedia(productId: $productId, media: $media) {
+        media { id status }
+        userErrors { field message }
+      }
+    }"""
+    res  = requests.post(API_URL, json={
+        "query": mutation,
+        "variables": {"productId": product_gid, "media": media_input}
+    }, headers=HEADERS)
+    result = res.json().get("data", {}).get("productCreateMedia", {})
+    if result.get("userErrors"):
+        print(f"  ⚠️ Create errors: {result['userErrors']}")
+    else:
+        print(f"  ✅ Created {len(result.get('media', []))} media")
+
+
+# ── Main ──────────────────────────────────────────────────────
+if __name__ == "__main__":
+    base_dir = os.path.dirname(__file__)
+    CSV_FILE = os.path.join(base_dir, "test.csv")
+
+    df = pd.read_csv(CSV_FILE)
+    print(f"Columns found: {df.columns.tolist()}")
+
+    sku_col = "Variant SKU" if "Variant SKU" in df.columns else "sku"
+    img_col = "Image Src"   if "Image Src"   in df.columns else "image_src"
+
+    if sku_col not in df.columns or img_col not in df.columns:
+        print(f"❌ Required columns not found. Available: {df.columns.tolist()}")
+        exit(1)
+
+    # กรองเฉพาะ row ที่มีทั้ง SKU และ Image Src
+    df = df[[sku_col, img_col]].dropna()
+    # รองรับหลาย URL ต่อ SKU (comma-separated)
+    df[img_col] = df[img_col].str.strip()
+
+    skus = df[sku_col].tolist()
+    print(f"📋 {len(skus)} SKUs to process")
+
+    gid_map = get_product_gids_by_skus(skus)
+
+    success = 0
+    failed  = 0
+
+    for _, row in df.iterrows():
+        sku = row[sku_col]
+        gid = gid_map.get(sku)
+
+        if not gid:
+            print(f"⚠️ SKU not found: {sku}")
+            failed += 1
+            continue
+
+        # รองรับหลาย URL ต่อ 1 product (comma-separated)
+        image_urls = [u.strip() for u in str(row[img_col]).split(",") if u.strip()]
+
+        print(f"\n🔄 {sku} → {gid}")
+        print(f"   Images: {image_urls}")
+
+        # 1. ดึง media เก่า
+        media_ids = get_media_ids(gid)
+        print(f"   Found {len(media_ids)} existing media")
+
+        # 2. ลบ media เก่า
+        delete_media(gid, media_ids)
+        time.sleep(0.5)
+
+        # 3. Upload รูปใหม่
+        create_media(gid, image_urls)
+
+        success += 1
+        time.sleep(0.5)  # rate limit
+
+    print(f"\n🎉 Done! Success: {success} | Failed: {failed}")

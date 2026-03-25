@@ -1,0 +1,28 @@
+{
+  "id": "gid://shopify/Menu/245262352583",
+  "title": "Main menu",
+  "items": [
+    {
+      "id": "gid://shopify/MenuItem/593381949639",
+      "title": "test main",
+      "type": "HTTP",
+      "url": "/",
+      "items": [
+        {
+          "id": "gid://shopify/MenuItem/593381982407",
+          "title": "Bakery Equipment",
+          "type": "HTTP",
+          "url": "/",
+          "items": [
+            {
+              "id": "gid://shopify/MenuItem/593382015175",
+              "title": "Bread Slicers",
+              "type": "HTTP",
+              "url": "https://sevenfive-4062.myshopify.com/collections/bread-slicers"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
