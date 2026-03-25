@@ -2,3 +2,8 @@ node_modules/
 .env
 create-collection/image\ logo.csv
 vendor-images/
+
+# Generated data files (do not commit)
+bulk-update-product/bulk.jsonl
+bulk-update-product/not_found.csv
+bulk-update-product/failed.csv
