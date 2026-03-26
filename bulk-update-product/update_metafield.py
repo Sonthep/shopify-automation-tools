@@ -24,7 +24,7 @@ from utils import make_headers, gql, get_product_gids_by_skus, API_URL
 HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 
 # ── Config ────────────────────────────────────────────────────
-CSV_FILE       = os.path.join(os.path.dirname(__file__), "test_update_power_type.csv")
+CSV_FILE       = os.path.join(os.path.dirname(__file__), "update_power_type.csv")
 JSONL_FILE     = os.path.join(os.path.dirname(__file__), "part_type_bulk.jsonl")
 GID_CACHE_FILE = os.path.join(os.path.dirname(__file__), "product_gids.json")
 COL_SKU        = "Variant SKU"
