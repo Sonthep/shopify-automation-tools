@@ -1,6 +1,7 @@
 """
 Shared utilities for Shopify GraphQL scripts.
 """
+import json
 import os
 import time
 import requests
@@ -54,8 +55,30 @@ def get_val(row: pd.Series, col: str) -> str | None:
     return str(val).strip() or None
 
 
-def get_product_gids_by_skus(api_url: str, headers: dict, skus: list, batch_size: int = 50) -> dict:
-    """Resolve a list of SKUs to product GIDs via GraphQL aliases."""
+def get_product_gids_by_skus(
+    api_url: str,
+    headers: dict,
+    skus: list,
+    batch_size: int = 50,
+    cache_file: str = None,
+) -> dict:
+    """Resolve a list of SKUs to product GIDs.
+
+    If cache_file is given and the file exists, loads the mapping from JSON
+    (built by fetch_product_gids.py) without hitting the API.
+    Falls back to GraphQL alias batching when no cache is available.
+    """
+    if cache_file and os.path.exists(cache_file):
+        with open(cache_file, encoding="utf-8") as f:
+            cache: dict = json.load(f)
+        gid_map = {sku: cache.get(sku) for sku in skus}
+        missing = [sku for sku, gid in gid_map.items() if gid is None]
+        if missing:
+            print(f"  ⚠️  {len(missing)} SKU(s) not in cache: {missing[:5]}")
+        print(f"  ✅ Loaded {len(gid_map)} GIDs from cache ({cache_file})")
+        return gid_map
+
+    # --- fallback: query API ---
     gid_map = {}
     for i in range(0, len(skus), batch_size):
         batch   = skus[i:i + batch_size]
