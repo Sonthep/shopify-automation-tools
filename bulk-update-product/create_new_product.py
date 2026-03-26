@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 SHOP  = os.getenv("SHOP_NAME")
-TOKEN = os.getenv("SHOPIFY_ACCESS_TOKEN_IMPORT_PRODUCT")
+TOKEN = os.getenv("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 print(f"SHOP: {SHOP}")
 print(f"TOKEN: {TOKEN[:10]}..." if TOKEN else "TOKEN: None")
 
@@ -185,7 +185,59 @@ def create_variant(product_id, product_options, row, default_variant_id=None):
     return variants[0]
 
 
-# ── Step 3: Add Images ────────────────────────────────────────
+# ── Step 3: Publish to Sales Channels ────────────────────────
+_publication_ids_cache = None
+
+def get_publication_ids():
+    global _publication_ids_cache
+    if _publication_ids_cache is not None:
+        return _publication_ids_cache
+
+    query = "{ publications(first: 20) { edges { node { id name } } } }"
+    body = gql(query)
+    if not body:
+        return []
+
+    target_names = {"online store", "point of sale"}
+    ids = [
+        edge["node"]["id"]
+        for edge in body.get("data", {}).get("publications", {}).get("edges", [])
+        if edge["node"]["name"].lower() in target_names
+    ]
+    _publication_ids_cache = ids
+    print(f"  📡 Publications found: {len(ids)}")
+    return ids
+
+
+def publish_product(product_id):
+    pub_ids = get_publication_ids()
+    if not pub_ids:
+        print("  ⚠️ No publications found to publish to")
+        return
+
+    mutation = """
+    mutation publishablePublish($id: ID!, $input: [PublicationInput!]!) {
+      publishablePublish(id: $id, input: $input) {
+        publishable { ... on Product { id } }
+        userErrors { field message }
+      }
+    }"""
+    variables = {
+        "id":    product_id,
+        "input": [{"publicationId": pid} for pid in pub_ids],
+    }
+    body = gql(mutation, variables)
+    if not body:
+        return
+
+    result = body.get("data", {}).get("publishablePublish", {})
+    if result.get("userErrors"):
+        print(f"  ⚠️ Publish errors: {result['userErrors']}")
+    else:
+        print(f"  🟢 Published to {len(pub_ids)} channel(s)")
+
+
+# ── Step 4: Add Images ────────────────────────────────────────
 def add_images(product_id, row):
     v = get_val(row, "Image Src")
     if not v:
@@ -294,11 +346,15 @@ if __name__ == "__main__":
         # Step 2: Update default variant (or create if none)
         variant = create_variant(product_id, product_options, row, default_variant_id)
 
-        # Step 3: Add images
+        # Step 3: Publish to Online Store + Point of Sale
+        time.sleep(0.3)
+        publish_product(product_id)
+
+        # Step 4: Add images
         time.sleep(0.3)
         add_images(product_id, row)
 
-        # Step 4: Set inventory
+        # Step 5: Set inventory
         qty = get_val(row, "Variant Inventory Qty")
         if qty and variant:
             inventory_item_id = variant.get("inventoryItem", {}).get("id")
