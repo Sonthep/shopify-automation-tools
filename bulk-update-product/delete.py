@@ -1,37 +1,9 @@
 import requests
 import pandas as pd
 import time
-import os
-from dotenv import load_dotenv
+from utils import make_headers, get_product_gids_by_skus, API_URL
 
-load_dotenv()
-
-SHOP  = os.getenv("SHOP_NAME")
-TOKEN = os.getenv("SHOPIFY_ACCESS_TOKEN_IMPORT_PRODUCT")
-print(f"SHOP: {SHOP}")
-print(f"TOKEN: {TOKEN[:10]}..." if TOKEN else "TOKEN: None")
-
-HEADERS = {"Content-Type": "application/json", "X-Shopify-Access-Token": TOKEN}
-API_URL = f"https://{SHOP}/admin/api/2025-01/graphql.json"
-
-
-# ── Resolve SKU → Product GID ─────────────────────────────────
-def get_product_gids_by_skus(skus, batch_size=50):
-    gid_map = {}
-    for i in range(0, len(skus), batch_size):
-        batch = skus[i:i+batch_size]
-        aliases = "\n".join([
-            f'p{j}: productVariants(first: 1, query: "sku:{sku}") {{ edges {{ node {{ product {{ id }} }} }} }}'
-            for j, sku in enumerate(batch)
-        ])
-        res  = requests.post(API_URL, json={"query": f"{{ {aliases} }}"}, headers=HEADERS)
-        data = res.json().get("data", {})
-        for j, sku in enumerate(batch):
-            edges = data.get(f"p{j}", {}).get("edges", [])
-            gid_map[sku] = edges[0]["node"]["product"]["id"] if edges else None
-        print(f"  Resolved {min(i+batch_size, len(skus))}/{len(skus)} SKUs")
-        time.sleep(0.5)
-    return gid_map
+HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_IMPORT_PRODUCT")
 
 
 # ── Delete product by GID ─────────────────────────────────────
@@ -77,7 +49,7 @@ if __name__ == "__main__":
         print("❌ Cancelled.")
         exit(0)
 
-    gid_map = get_product_gids_by_skus(skus)
+    gid_map = get_product_gids_by_skus(API_URL, HEADERS, skus)
 
     success = 0
     failed  = 0

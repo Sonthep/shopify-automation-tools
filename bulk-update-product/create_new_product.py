@@ -1,41 +1,18 @@
 import requests
 import pandas as pd
 import time
-import os
-from dotenv import load_dotenv
+from utils import make_headers, gql as _gql, get_val as _get_val, API_URL
 
-load_dotenv()
-
-SHOP  = os.getenv("SHOP_NAME")
-TOKEN = os.getenv("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
-print(f"SHOP: {SHOP}")
-print(f"TOKEN: {TOKEN[:10]}..." if TOKEN else "TOKEN: None")
-
-HEADERS = {"Content-Type": "application/json", "X-Shopify-Access-Token": TOKEN}
-API_URL = f"https://{SHOP}/admin/api/2026-01/graphql.json"
+HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 
 
-# ── Helper ────────────────────────────────────────────────────
+# ── Helper wrappers (delegate to utils) ───────────────────────
 def get_val(row, col):
-    if col not in row.index:
-        return None
-    val = row[col]
-    if pd.isna(val):
-        return None
-    return str(val).strip()
+    return _get_val(row, col)
 
 
 def gql(query, variables=None):
-    """Execute GraphQL and return body dict."""
-    res  = requests.post(API_URL, json={"query": query, "variables": variables or {}}, headers=HEADERS)
-    body = res.json()
-    if res.status_code != 200:
-        print(f"  ❌ HTTP {res.status_code}: {body}")
-        return None
-    if body.get("errors"):
-        print(f"  ❌ GraphQL errors: {body['errors']}")
-        return None
-    return body
+    return _gql(API_URL, HEADERS, query, variables)
 
 
 # ── Step 1: Create Product ────────────────────────────────────

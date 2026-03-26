@@ -1,19 +1,9 @@
-import requests
 import pandas as pd
 import json
 import time
-import os
-from dotenv import load_dotenv
+from utils import make_headers, get_product_gids_by_skus, API_URL
 
-load_dotenv()
-
-SHOP  = os.getenv("SHOP_NAME")
-TOKEN = os.getenv("SHOPIFY_ACCESS_TOKEN_IMPORT_PRODUCT")
-print(f"SHOP: {SHOP}")
-print(f"TOKEN: {TOKEN[:10]}..." if TOKEN else "TOKEN: None")
-
-HEADERS  = {"Content-Type": "application/json", "X-Shopify-Access-Token": TOKEN}
-API_URL  = f"https://{SHOP}/admin/api/2025-01/graphql.json"
+HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_IMPORT_PRODUCT")
 
 # ── Column mapping (CSV header → Shopify field) ───────────────
 COL = {
@@ -71,7 +61,7 @@ def build_jsonl(csv_file, jsonl_file):
     skus = df[sku_col].dropna().tolist()
     print(f"📋 {len(skus)} SKUs found")
 
-    gid_map   = get_product_gids_by_skus(skus)
+    gid_map   = get_product_gids_by_skus(API_URL, HEADERS, skus)
     not_found = [s for s, g in gid_map.items() if g is None]
     if not_found:
         print(f"⚠️ Not found: {not_found}")
