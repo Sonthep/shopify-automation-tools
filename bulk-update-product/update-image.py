@@ -1,9 +1,10 @@
+import os
 import requests
 import pandas as pd
 import time
 from utils import make_headers, get_product_gids_by_skus, API_URL
 
-HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_IMPORT_PRODUCT")
+HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 
 
 # ── Get existing media IDs for a product ─────────────────────
@@ -71,7 +72,7 @@ def create_media(product_gid, image_urls):
 # ── Main ──────────────────────────────────────────────────────
 if __name__ == "__main__":
     base_dir = os.path.dirname(__file__)
-    CSV_FILE = os.path.join(base_dir, "test.csv")
+    CSV_FILE = os.path.join(base_dir, "update_image.csv")
 
     df = pd.read_csv(CSV_FILE)
     print(f"Columns found: {df.columns.tolist()}")
