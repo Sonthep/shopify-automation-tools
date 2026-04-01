@@ -31,7 +31,7 @@ def delete_product(product_gid):
 # ── Main ──────────────────────────────────────────────────────
 if __name__ == "__main__":
     base_dir = os.path.dirname(__file__)
-    CSV_FILE = os.path.join(base_dir, "delete_31369.csv")  # ต้องมี column "Variant SKU"
+    CSV_FILE = os.path.join(base_dir, "delete_1469.csv")  # ต้องมี column "Variant SKU"
 
     df = pd.read_csv(CSV_FILE)
     print(f"Columns found: {df.columns.tolist()}")

@@ -1,9 +1,12 @@
 import pandas as pd
 import json
 import time
+import os
+import requests
 from utils import make_headers, get_product_gids_by_skus, API_URL
 
-HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_IMPORT_PRODUCT")
+
+HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 
 # ── Column mapping (CSV header → Shopify field) ───────────────
 COL = {
@@ -12,30 +15,12 @@ COL = {
     "body_html":        "Body (HTML)",
     "vendor":           "Vendor",
     "product_type":     "Product Type",
+    "power_type":       "Power Type",
     "tags":             "Tags",
     "status":           "Status",
     "price":            "Price",
     "compare_at_price": "Compare At Price",
 }
-
-
-# ── Resolve SKU → Product GID ─────────────────────────────────
-def get_product_gids_by_skus(skus, batch_size=50):
-    gid_map = {}
-    for i in range(0, len(skus), batch_size):
-        batch = skus[i:i+batch_size]
-        aliases = "\n".join([
-            f'p{j}: productVariants(first: 1, query: "sku:{sku}") {{ edges {{ node {{ product {{ id }} }} }} }}'
-            for j, sku in enumerate(batch)
-        ])
-        res  = requests.post(API_URL, json={"query": f"{{ {aliases} }}"}, headers=HEADERS)
-        data = res.json().get("data", {})
-        for j, sku in enumerate(batch):
-            edges = data.get(f"p{j}", {}).get("edges", [])
-            gid_map[sku] = edges[0]["node"]["product"]["id"] if edges else None
-        print(f"  Resolved {min(i+batch_size, len(skus))}/{len(skus)} SKUs")
-        time.sleep(0.5)
-    return gid_map
 
 
 # ── Helper: safe get value from row ──────────────────────────
@@ -81,13 +66,19 @@ def build_jsonl(csv_file, jsonl_file):
                 input_data["title"] = v
 
             if v := get_val(row, COL["body_html"]):
-                input_data["bodyHtml"] = v
+                input_data["descriptionHtml"] = v
 
             if v := get_val(row, COL["vendor"]):
                 input_data["vendor"] = v
 
             if v := get_val(row, COL["product_type"]):
                 input_data["productType"] = v
+                input_data.setdefault("metafields", []).append({
+                    "namespace": "custom",
+                    "key":       "part_type",
+                    "value":     v,
+                    "type":      "single_line_text_field",
+                })
 
             if v := get_val(row, COL["tags"]):
                 input_data["tags"] = [t.strip() for t in v.split(",")]
@@ -210,7 +201,7 @@ def poll_status(interval=15):
 # ── Main ──────────────────────────────────────────────────────
 if __name__ == "__main__":
     base_dir   = os.path.dirname(__file__)
-    CSV_FILE   = os.path.join(base_dir, "test_create.csv")
+    CSV_FILE   = os.path.join(base_dir, "update_data.csv")
     JSONL_FILE = os.path.join(base_dir, "bulk.jsonl")
 
     print(f"Using CSV: {CSV_FILE}")
