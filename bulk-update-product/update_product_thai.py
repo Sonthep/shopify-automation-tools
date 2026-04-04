@@ -1,12 +1,11 @@
 import sys
-import requests
 import csv
 import json
 import time
 import os
-from urllib.parse import urlparse
+import requests
 import pandas as pd
-from utils import make_headers, get_product_gids_by_skus, API_URL
+from utils import make_headers, get_product_gids_by_skus, gql, API_URL
 
 # Fix Unicode/emoji output on Windows terminals (e.g. CP874)
 if hasattr(sys.stdout, "reconfigure"):
@@ -33,12 +32,9 @@ COL = {
 SKU_COL = "Variant SKU"
 
 
-# ===== GRAPHQL HELPER =====
 def graphql(query, variables=None):
-    r = requests.post(ENDPOINT, headers=HEADERS,
-                      json={"query": query, "variables": variables or {}})
-    r.raise_for_status()
-    return r.json()
+    """Thin wrapper around utils.gql that uses module-level ENDPOINT/HEADERS."""
+    return gql(ENDPOINT, HEADERS, query, variables)
 
 
 # ===== STEP 1: Get Digests (batched via aliases) =====
@@ -222,23 +218,25 @@ def build_jsonl(csv_path, jsonl_path):
                 continue
 
             for field, csv_col in COL.items():
-                if csv_col not in df.columns:
+                if csv_col not in df.columns or field not in digests:
                     continue
-                value = str(row.get(csv_col, "") or "").strip()
-                if pd.isna(row.get(csv_col)):
-                    value = ""
-                if value and field in digests:
-                    entry = {
-                        "resourceId": product_gid,
-                        "input": {
-                            "key": field,
-                            "value": value,
-                            "locale": LOCALE,
-                            "translatableContentDigest": digests[field]
-                        }
-                    }
-                    jsonlfile.write(json.dumps(entry, ensure_ascii=False) + "\n")
-                    rows_written += 1
+                raw = row.get(csv_col)
+                if pd.isna(raw):
+                    continue
+                value = str(raw).strip()
+                if not value:
+                    continue
+                entry = {
+                    "resourceId": product_gid,
+                    "input": {
+                        "key": field,
+                        "value": value,
+                        "locale": LOCALE,
+                        "translatableContentDigest": digests[field],
+                    },
+                }
+                jsonlfile.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                rows_written += 1
 
             log_rows.append({"product_gid": product_gid, "status": "QUEUED"})
 
