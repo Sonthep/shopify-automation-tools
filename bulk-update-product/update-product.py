@@ -201,7 +201,7 @@ def poll_status(interval=15):
 # ── Main ──────────────────────────────────────────────────────
 if __name__ == "__main__":
     base_dir   = os.path.dirname(__file__)
-    CSV_FILE   = os.path.join(base_dir, "update_data.csv")
+    CSV_FILE   = os.path.join(base_dir, "update_des.csv")
     JSONL_FILE = os.path.join(base_dir, "bulk.jsonl")
 
     print(f"Using CSV: {CSV_FILE}")

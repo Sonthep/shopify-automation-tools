@@ -72,7 +72,7 @@ def create_media(product_gid, image_urls):
 # ── Main ──────────────────────────────────────────────────────
 if __name__ == "__main__":
     base_dir = os.path.dirname(__file__)
-    CSV_FILE = os.path.join(base_dir, "update_image.csv")
+    CSV_FILE = os.path.join(base_dir, "update_image_set2.csv")
 
     df = pd.read_csv(CSV_FILE)
     print(f"Columns found: {df.columns.tolist()}")
