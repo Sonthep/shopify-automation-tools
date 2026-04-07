@@ -1,12 +1,16 @@
+import sys
 import pandas as pd
 import json
 import time
 import os
 import requests
-from utils import make_headers, get_product_gids_by_skus, API_URL
+from utils import make_headers, get_product_gids_by_skus, gql, API_URL
+
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 
-HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
+HEADERS     = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
+LOCATION_ID = os.getenv("SHOPIFY_LOCATION_ID", "")
 
 # ── Column mapping (CSV header → Shopify field) ───────────────
 COL = {
@@ -20,6 +24,7 @@ COL = {
     "status":           "Status",
     "price":            "Price",
     "compare_at_price": "Compare At Price",
+    "inventory_qty":    "Inventory quantity",
 }
 
 
@@ -52,6 +57,7 @@ def build_jsonl(csv_file, jsonl_file):
         print(f"⚠️ Not found: {not_found}")
         pd.DataFrame({"sku": not_found}).to_csv("not_found.csv", index=False)
 
+    sku_qty_map = {}
     count = 0
     with open(jsonl_file, "w", encoding="utf-8") as f:
         for _, row in df.iterrows():
@@ -86,6 +92,11 @@ def build_jsonl(csv_file, jsonl_file):
             if v := get_val(row, COL["status"]):
                 input_data["status"] = v.upper()
 
+            # ── Inventory qty (collected separately, updated via inventorySetOnHandQuantities) ──
+            inventory_qty = get_val(row, COL["inventory_qty"])
+            if inventory_qty:
+                sku_qty_map[sku] = inventory_qty
+
             # ── Variants (price / compare_at_price) ──
             price         = get_val(row, COL["price"])
             compare_price = get_val(row, COL["compare_at_price"])
@@ -105,7 +116,147 @@ def build_jsonl(csv_file, jsonl_file):
             count += 1
 
     print(f"✅ {count} rows → {jsonl_file}")
-    return count
+    return count, sku_qty_map
+
+
+# ── Inventory Update ─────────────────────────────────────────
+import csv as _csv
+
+
+def read_inventory_csv(filepath: str) -> list:
+    rows = []
+    with open(filepath, newline="", encoding="utf-8-sig") as f:
+        reader = _csv.DictReader(f)
+        for row in reader:
+            sku = row["sku"].strip()
+            qty = int(row["quantity"].strip())
+            rows.append({"sku": sku, "quantity": qty})
+    print(f"Loaded {len(rows)} rows from {filepath}")
+    return rows
+
+
+def get_inventory_item_by_sku(sku: str):
+    """Return (inventoryItemId, locationId, current_qty) for a SKU."""
+    query = """
+    query getInventoryBySku($query: String!) {
+      productVariants(first: 5, query: $query) {
+        edges {
+          node {
+            sku
+            inventoryItem {
+              id
+              inventoryLevels(first: 5) {
+                edges {
+                  node {
+                    location { id }
+                    quantities(names: ["available"]) {
+                      name
+                      quantity
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }"""
+    body = gql(API_URL, HEADERS, query, {"query": f"sku:{sku}"})
+    if not body:
+        return None, None, None
+
+    edges = body["data"]["productVariants"]["edges"]
+    for edge in edges:
+        node = edge["node"]
+        if node["sku"] == sku:
+            inv_id = node["inventoryItem"]["id"]
+            levels = node["inventoryItem"]["inventoryLevels"]["edges"]
+            if not levels:
+                return inv_id, None, None
+            for lvl in levels:
+                loc = lvl["node"]["location"]
+                if not LOCATION_ID or loc["id"] == LOCATION_ID:
+                    current_qty = lvl["node"]["quantities"][0]["quantity"]
+                    return inv_id, loc["id"], current_qty
+    return None, None, None
+
+
+def set_inventory_quantity(inventory_item_id: str, location_id: str, new_quantity: int):
+    mutation = """
+    mutation setInventoryQuantity($input: InventorySetQuantitiesInput!) {
+      inventorySetQuantities(input: $input) {
+        inventoryAdjustmentGroup {
+          changes { name delta quantityAfterChange }
+        }
+        userErrors { field message }
+      }
+    }"""
+    variables = {
+        "input": {
+            "name": "available",
+            "reason": "correction",
+            "ignoreCompareQuantity": True,
+            "quantities": [{
+                "inventoryItemId": inventory_item_id,
+                "locationId":      location_id,
+                "quantity":        new_quantity,
+            }],
+        }
+    }
+    body = gql(API_URL, HEADERS, mutation, variables)
+    if not body:
+        return False, [{"message": "No response from API"}]
+    errors = body["data"]["inventorySetQuantities"]["userErrors"]
+    if errors:
+        return False, errors
+    changes = body["data"]["inventorySetQuantities"]["inventoryAdjustmentGroup"]["changes"]
+    return True, changes
+
+
+def update_inventory_from_csv(inventory_csv: str):
+    """Read inventory.csv and set quantities via inventorySetQuantities."""
+    rows = read_inventory_csv(inventory_csv)
+    success_count = 0
+    fail_count    = 0
+    skipped       = []
+
+    for row in rows:
+        sku     = row["sku"]
+        new_qty = row["quantity"]
+        print(f"\nProcessing SKU: {sku} -> qty={new_qty}")
+
+        inv_item_id, loc_id, current_qty = get_inventory_item_by_sku(sku)
+
+        if not inv_item_id:
+            print(f"  Warning: SKU not found: {sku}")
+            skipped.append(sku)
+            fail_count += 1
+            time.sleep(0.5)
+            continue
+
+        if not loc_id:
+            print(f"  Warning: No inventory location for SKU: {sku}")
+            skipped.append(sku)
+            fail_count += 1
+            time.sleep(0.5)
+            continue
+
+        ok, result = set_inventory_quantity(inv_item_id, loc_id, new_qty)
+        if ok:
+            for c in result:
+                print(f"  OK '{c['name']}': {current_qty} -> {c['quantityAfterChange']} (delta {c['delta']})")
+            success_count += 1
+        else:
+            print(f"  Error: {result}")
+            fail_count += 1
+
+        time.sleep(0.5)
+
+    print(f"\n{'='*40}")
+    print(f"Success : {success_count}")
+    print(f"Failed  : {fail_count}")
+    if skipped:
+        print(f"Skipped : {', '.join(skipped)}")
 
 
 # ── Staged Upload ─────────────────────────────────────────────
@@ -200,28 +351,74 @@ def poll_status(interval=15):
 
 # ── Main ──────────────────────────────────────────────────────
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Shopify product & inventory updater")
+    parser.add_argument("--csv",       default="data/update_qty.csv", help="Main product CSV")
+    parser.add_argument("--inv-csv",   default="",                    help="Inventory-only CSV (sku, quantity columns)")
+    parser.add_argument("--inv-only",  action="store_true",           help="Skip product update, run inventory only")
+    args = parser.parse_args()
+
     base_dir   = os.path.dirname(__file__)
-    CSV_FILE   = os.path.join(base_dir, "update_des.csv")
+    CSV_FILE   = os.path.join(base_dir, args.csv)
     JSONL_FILE = os.path.join(base_dir, "bulk.jsonl")
 
-    print(f"Using CSV: {CSV_FILE}")
-    print(f"Using JSONL: {JSONL_FILE}")
+    # ── Product update ──
+    if not args.inv_only:
+        print(f"Using CSV: {CSV_FILE}")
+        count, sku_qty_map = build_jsonl(CSV_FILE, JSONL_FILE)
 
-    count = build_jsonl(CSV_FILE, JSONL_FILE)
-    if count == 0:
-        print("No rows to process.")
-        exit()
+        if count > 0:
+            target = create_staged_upload()
+            if not target:
+                exit(1)
 
-    target = create_staged_upload()
-    if not target:
-        exit(1)
+            resource_url = upload_jsonl(target, JSONL_FILE)
 
-    resource_url = upload_jsonl(target, JSONL_FILE)
+            op = run_bulk_mutation(resource_url)
+            if not op:
+                print("Bulk mutation did not start. Exiting.")
+                exit(1)
 
-    op = run_bulk_mutation(resource_url)
-    if not op:
-        print("Bulk mutation did not start. Exiting.")
-        exit(1)
+            result_url = poll_status()
+            print(f"Done! Result: {result_url}")
+        else:
+            print("No product fields to update — skipping bulk upload.")
+    else:
+        sku_qty_map = {}
 
-    result_url = poll_status()
-    print(f"🎉 Done! Result: {result_url}")
+    # ── Inventory update ──
+    # Priority: --inv-csv flag > inventory.csv next to script > qty from main CSV
+    inv_csv_path = (
+        os.path.join(base_dir, args.inv_csv) if args.inv_csv else
+        os.path.join(base_dir, "data/inventory.csv") if os.path.exists(os.path.join(base_dir, "data/inventory.csv")) else
+        None
+    )
+
+    if inv_csv_path:
+        print(f"\nRunning inventory update from: {inv_csv_path}")
+        update_inventory_from_csv(inv_csv_path)
+    elif sku_qty_map:
+        print(f"\nUpdating inventory for {len(sku_qty_map)} SKUs from main CSV...")
+        # build a temp list and reuse update_inventory_from_csv logic inline
+        import io as _io
+        tmp = _io.StringIO("sku,quantity\n" + "\n".join(f"{s},{q}" for s, q in sku_qty_map.items()))
+        rows = list(_csv.DictReader(tmp))
+        rows = [{"sku": r["sku"], "quantity": int(r["quantity"])} for r in rows]
+        success, fail, skipped = 0, 0, []
+        for row in rows:
+            inv_id, loc_id, cur = get_inventory_item_by_sku(row["sku"])
+            if not inv_id or not loc_id:
+                print(f"  Warning: SKU not found or no location: {row['sku']}")
+                skipped.append(row["sku"]); fail += 1; time.sleep(0.5); continue
+            ok, result = set_inventory_quantity(inv_id, loc_id, row["quantity"])
+            if ok:
+                for c in result:
+                    print(f"  OK {row['sku']} '{c['name']}': {cur} -> {c['quantityAfterChange']}")
+                success += 1
+            else:
+                print(f"  Error {row['sku']}: {result}"); fail += 1
+            time.sleep(0.5)
+        print(f"\nInventory — Success: {success}, Failed: {fail}")
+
+    print("\nAll done!")
