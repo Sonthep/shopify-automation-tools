@@ -29,20 +29,34 @@ def make_headers(token_env: str) -> dict:
 
 
 def gql(api_url: str, headers: dict, query: str, variables: dict = None) -> dict | None:
-    """Execute a GraphQL query/mutation. Returns body dict or None on error."""
-    res = requests.post(api_url, json={"query": query, "variables": variables or {}}, headers=headers)
-    try:
-        body = res.json()
-    except ValueError:
-        print(f"  ❌ Invalid JSON response: {res.text[:200]}")
-        return None
-    if res.status_code != 200:
-        print(f"  ❌ HTTP {res.status_code}: {body}")
-        return None
-    if body.get("errors"):
-        print(f"  ❌ GraphQL errors: {body['errors']}")
-        return None
-    return body
+    """Execute a GraphQL query/mutation. Returns body dict or None on error.
+    Automatically retries on THROTTLED errors with exponential backoff.
+    """
+    max_retries = 6
+    wait = 2.0
+    for attempt in range(max_retries):
+        res = requests.post(api_url, json={"query": query, "variables": variables or {}}, headers=headers)
+        try:
+            body = res.json()
+        except ValueError:
+            print(f"  ❌ Invalid JSON response: {res.text[:200]}")
+            return None
+        if res.status_code != 200:
+            print(f"  ❌ HTTP {res.status_code}: {body}")
+            return None
+        errors = body.get("errors", [])
+        if errors:
+            # Check if ALL errors are throttling errors — retry with backoff
+            if all(e.get("extensions", {}).get("code") == "THROTTLED" for e in errors):
+                print(f"  ⏳ Throttled — retrying in {wait:.0f}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait)
+                wait = min(wait * 2, 60)
+                continue
+            print(f"  ❌ GraphQL errors: {errors}")
+            return None
+        return body
+    print(f"  ❌ Gave up after {max_retries} retries (throttle)")
+    return None
 
 
 def get_val(row: pd.Series, col: str) -> str | None:
