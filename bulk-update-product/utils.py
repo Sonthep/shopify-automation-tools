@@ -109,3 +109,30 @@ def get_product_gids_by_skus(
         print(f"  Resolved {min(i + batch_size, len(skus))}/{len(skus)} SKUs")
         time.sleep(0.5)
     return gid_map
+
+
+def get_variant_gids_by_skus(
+    api_url: str,
+    headers: dict,
+    skus: list,
+    batch_size: int = 50,
+) -> dict:
+    """Resolve a list of SKUs to variant GIDs (needed for price updates).
+    Returns {sku: variant_gid or None}.
+    """
+    gid_map = {}
+    for i in range(0, len(skus), batch_size):
+        batch = skus[i:i + batch_size]
+        aliases = "\n".join([
+            f'p{j}: productVariants(first: 1, query: "sku:{sku}") '
+            f'{{ edges {{ node {{ id }} }} }}'
+            for j, sku in enumerate(batch)
+        ])
+        body = gql(api_url, headers, f"{{ {aliases} }}")
+        data = (body or {}).get("data", {})
+        for j, sku in enumerate(batch):
+            edges = data.get(f"p{j}", {}).get("edges", [])
+            gid_map[sku] = edges[0]["node"]["id"] if edges else None
+        print(f"  Variant GIDs resolved {min(i + batch_size, len(skus))}/{len(skus)}")
+        time.sleep(0.5)
+    return gid_map

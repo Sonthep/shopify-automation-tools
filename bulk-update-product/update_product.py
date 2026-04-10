@@ -8,7 +8,7 @@ import argparse
 import pandas as pd
 import requests
 
-from utils import make_headers, get_product_gids_by_skus, get_val, gql, API_URL
+from utils import make_headers, get_product_gids_by_skus, get_variant_gids_by_skus, get_val, gql, API_URL
 
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
@@ -33,7 +33,7 @@ COL = {
 
 # ── Product update (Bulk API) ─────────────────────────────────
 
-def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, dict]:
+def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, dict, list]:
     df = pd.read_csv(csv_file)
     print(f"Columns found: {df.columns.tolist()}")
 
@@ -45,13 +45,15 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, dict]:
     skus = df[sku_col].dropna().tolist()
     print(f"{len(skus)} SKUs found")
 
-    gid_map   = get_product_gids_by_skus(API_URL, HEADERS, skus)
+    gid_map         = get_product_gids_by_skus(API_URL, HEADERS, skus)
+    variant_gid_map = get_variant_gids_by_skus(API_URL, HEADERS, skus)
     not_found = [s for s, g in gid_map.items() if g is None]
     if not_found:
         print(f"Not found: {not_found}")
         pd.DataFrame({"sku": not_found}).to_csv("not_found.csv", index=False)
 
     sku_qty_map: dict[str, str] = {}
+    price_entries: list = []
     count = 0
 
     with open(jsonl_file, "w", encoding="utf-8") as f:
@@ -88,12 +90,15 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, dict]:
             price         = get_val(row, COL["price"])
             compare_price = get_val(row, COL["compare_at_price"])
             if price or compare_price:
-                variant: dict = {}
-                if price:
-                    variant["price"] = price
-                if compare_price:
-                    variant["compareAtPrice"] = compare_price
-                input_data["variants"] = [variant]
+                # API 2024-07+: price must be updated via productVariantsBulkUpdate, NOT productUpdate
+                variant_gid = variant_gid_map.get(sku)
+                if variant_gid:
+                    price_entries.append({
+                        "productId":    gid,
+                        "variantId":    variant_gid,
+                        "price":        price,
+                        "compareAtPrice": compare_price,
+                    })
 
             if len(input_data) <= 1:
                 continue
@@ -101,8 +106,8 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, dict]:
             f.write(json.dumps({"input": input_data}) + "\n")
             count += 1
 
-    print(f"{count} rows -> {jsonl_file}")
-    return count, sku_qty_map
+    print(f"{count} product rows -> {jsonl_file} | {len(price_entries)} price entries collected")
+    return count, sku_qty_map, price_entries
 
 
 def create_staged_upload(filename: str = "bulk.jsonl") -> dict | None:
@@ -136,6 +141,49 @@ def upload_jsonl(target: dict, filepath: str) -> str:
     res.raise_for_status()
     print(f"Uploaded: {filepath} (HTTP {res.status_code})")
     return target["resourceUrl"]
+
+
+def build_price_jsonl(price_entries: list, jsonl_file: str) -> int:
+    """Build JSONL for productVariantsBulkUpdate (Shopify API 2024-07+)."""
+    count = 0
+    with open(jsonl_file, "w", encoding="utf-8") as f:
+        for entry in price_entries:
+            variant_input: dict = {"id": entry["variantId"]}
+            if entry.get("price") is not None:
+                variant_input["price"] = entry["price"]
+            if entry.get("compareAtPrice") is not None:
+                variant_input["compareAtPrice"] = entry["compareAtPrice"]
+            f.write(json.dumps({"productId": entry["productId"], "variants": [variant_input]}) + "\n")
+            count += 1
+    print(f"{count} price rows -> {jsonl_file}")
+    return count
+
+
+def run_price_bulk_mutation(resource_url: str) -> dict | None:
+    mutation = """
+    mutation bulkPriceUpdate($stagedUploadPath: String!) {
+      bulkOperationRunMutation(
+        mutation: "mutation variantPriceUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+          productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+            productVariants { id price compareAtPrice }
+            userErrors { field message }
+          }
+        }",
+        stagedUploadPath: $stagedUploadPath
+      ) {
+        bulkOperation { id status }
+        userErrors { field message }
+      }
+    }"""
+    body = gql(API_URL, HEADERS, mutation, {"stagedUploadPath": resource_url})
+    if not body:
+        return None
+    op = body["data"]["bulkOperationRunMutation"]
+    if op["userErrors"]:
+        print(f"Price bulk mutation error: {op['userErrors']}")
+        return None
+    print(f"Price bulk operation started: {op['bulkOperation']['id']}")
+    return op
 
 
 def run_bulk_mutation(resource_url: str) -> dict | None:
@@ -373,15 +421,16 @@ if __name__ == "__main__":
         os.remove(INVENTORY_CACHE_FILE)
         print(f"Cache deleted: {INVENTORY_CACHE_FILE}")
 
-    CSV_FILE   = os.path.join(base_dir, args.csv)
+    CSV_FILE   = os.path.join(base_dir, "data/update_price_test.csv")
     JSONL_FILE = os.path.join(base_dir, "bulk.jsonl")
 
-    sku_qty_map: dict = {}
+    sku_qty_map: dict  = {}
+    price_entries: list = []
 
     # ── 1. Product fields update ──
     if not args.inv_only:
         print(f"Using CSV: {CSV_FILE}")
-        count, sku_qty_map = build_jsonl(CSV_FILE, JSONL_FILE)
+        count, sku_qty_map, price_entries = build_jsonl(CSV_FILE, JSONL_FILE)
 
         if count > 0:
             target = create_staged_upload()
@@ -396,6 +445,23 @@ if __name__ == "__main__":
             print(f"Bulk done. Result URL: {result_url}")
         else:
             print("No product fields to update — skipping bulk upload.")
+
+        # ── 1b. Price / compareAtPrice update (requires separate bulk op) ──
+        if price_entries:
+            print(f"\nPrice update for {len(price_entries)} variant(s)...")
+            price_jsonl = os.path.join(base_dir, "price_bulk.jsonl")
+            build_price_jsonl(price_entries, price_jsonl)
+            target = create_staged_upload("price_bulk.jsonl")
+            if not target:
+                print("  Failed to create staged upload for prices.")
+            else:
+                resource_url = upload_jsonl(target, price_jsonl)
+                op = run_price_bulk_mutation(resource_url)
+                if op:
+                    result_url = poll_status()
+                    print(f"Price bulk done. Result URL: {result_url}")
+                else:
+                    print("  Price bulk mutation did not start.")
 
     # ── 2. Inventory update ──
     inv_csv_path = (
