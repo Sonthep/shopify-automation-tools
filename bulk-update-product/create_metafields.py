@@ -90,7 +90,6 @@ def create_metafield_definition(row: dict) -> dict | None:
             "type":                     row["type"].strip(),
             "description":              row.get("description", "").strip(),
             "ownerType":                "PRODUCT",
-            "visibleToStorefrontApi":   True,
             "useAsCollectionCondition": parse_bool(row.get("filterable", "false")),
         }
     }
