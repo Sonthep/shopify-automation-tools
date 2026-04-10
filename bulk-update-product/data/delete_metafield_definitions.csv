@@ -1,0 +1,4 @@
+namespace,key,delete_data
+specs,power_watt,false
+specs,weight_kg,false
+
