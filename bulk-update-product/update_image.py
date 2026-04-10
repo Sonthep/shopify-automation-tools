@@ -1,8 +1,7 @@
 import os
-import requests
 import pandas as pd
 import time
-from utils import make_headers, get_product_gids_by_skus, API_URL
+from utils import make_headers, get_product_gids_by_skus, gql, API_URL
 
 HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 
@@ -17,8 +16,10 @@ def get_media_ids(product_gid):
         }
       }
     }"""
-    res  = requests.post(API_URL, json={"query": query, "variables": {"id": product_gid}}, headers=HEADERS)
-    data = res.json().get("data", {})
+    body  = gql(API_URL, HEADERS, query, {"id": product_gid})
+    if not body:
+        return []
+    data  = body.get("data", {})
     edges = data.get("product", {}).get("media", {}).get("edges", [])
     return [e["node"]["id"] for e in edges]
 
@@ -34,11 +35,10 @@ def delete_media(product_gid, media_ids):
         userErrors { field message }
       }
     }"""
-    res  = requests.post(API_URL, json={
-        "query": mutation,
-        "variables": {"productId": product_gid, "mediaIds": media_ids}
-    }, headers=HEADERS)
-    result = res.json().get("data", {}).get("productDeleteMedia", {})
+    body   = gql(API_URL, HEADERS, mutation, {"productId": product_gid, "mediaIds": media_ids})
+    if not body:
+        return
+    result = body.get("data", {}).get("productDeleteMedia", {})
     if result.get("userErrors"):
         print(f"  ⚠️ Delete errors: {result['userErrors']}")
     else:
@@ -58,11 +58,10 @@ def create_media(product_gid, image_urls):
         userErrors { field message }
       }
     }"""
-    res  = requests.post(API_URL, json={
-        "query": mutation,
-        "variables": {"productId": product_gid, "media": media_input}
-    }, headers=HEADERS)
-    result = res.json().get("data", {}).get("productCreateMedia", {})
+    body   = gql(API_URL, HEADERS, mutation, {"productId": product_gid, "media": media_input})
+    if not body:
+        return
+    result = body.get("data", {}).get("productCreateMedia", {})
     if result.get("userErrors"):
         print(f"  ⚠️ Create errors: {result['userErrors']}")
     else:
@@ -72,7 +71,7 @@ def create_media(product_gid, image_urls):
 # ── Main ──────────────────────────────────────────────────────
 if __name__ == "__main__":
     base_dir = os.path.dirname(__file__)
-    CSV_FILE = os.path.join(base_dir, "update_image_set2.csv")
+    CSV_FILE = os.path.join(base_dir, "data", "update_image_set2.csv")
 
     df = pd.read_csv(CSV_FILE)
     print(f"Columns found: {df.columns.tolist()}")

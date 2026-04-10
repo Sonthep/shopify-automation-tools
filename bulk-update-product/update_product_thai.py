@@ -19,8 +19,8 @@ ENDPOINT = API_URL
 
 base_dir    = os.path.dirname(__file__)
 CSV_FILE    = os.path.join(base_dir, "data/update_data_thai1.csv")
-JSONL_FILE  = os.path.join(base_dir, "bulk.jsonl")
-LOG_FILE    = os.path.join(base_dir, "upload_log.csv")
+JSONL_FILE  = os.path.join(base_dir, "output", "bulk.jsonl")
+LOG_FILE    = os.path.join(base_dir, "output", "upload_log.csv")
 
 # Shopify translation key → CSV column name
 COL = {

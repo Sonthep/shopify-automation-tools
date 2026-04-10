@@ -1,8 +1,7 @@
-import requests
 import pandas as pd
 import time
 import os
-from utils import make_headers, get_product_gids_by_skus, API_URL
+from utils import make_headers, get_product_gids_by_skus, gql, API_URL
 
 HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 
@@ -16,11 +15,10 @@ def delete_product(product_gid):
         userErrors { field message }
       }
     }"""
-    res    = requests.post(API_URL, json={
-        "query": mutation,
-        "variables": {"input": {"id": product_gid}}
-    }, headers=HEADERS)
-    result = res.json().get("data", {}).get("productDelete", {})
+    body   = gql(API_URL, HEADERS, mutation, {"input": {"id": product_gid}})
+    if not body:
+        return False
+    result = body.get("data", {}).get("productDelete", {})
     if result.get("userErrors"):
         print(f"  ⚠️ Error: {result['userErrors']}")
         return False
@@ -31,7 +29,7 @@ def delete_product(product_gid):
 # ── Main ──────────────────────────────────────────────────────
 if __name__ == "__main__":
     base_dir = os.path.dirname(__file__)
-    CSV_FILE = os.path.join(base_dir, "delete_1469.csv")  # ต้องมี column "Variant SKU"
+    CSV_FILE = os.path.join(base_dir, "data", "delete_1469.csv")  # ต้องมี column "Variant SKU"
 
     df = pd.read_csv(CSV_FILE)
     print(f"Columns found: {df.columns.tolist()}")
@@ -74,7 +72,7 @@ if __name__ == "__main__":
         time.sleep(0.5)  # rate limit
 
     if not_found:
-        pd.DataFrame({"sku": not_found}).to_csv("not_found.csv", index=False)
-        print(f"\n⚠️ {len(not_found)} SKUs not found → saved to not_found.csv")
+        pd.DataFrame({"sku": not_found}).to_csv(os.path.join(base_dir, "output", "not_found.csv"), index=False)
+        print(f"\n⚠️ {len(not_found)} SKUs not found → saved to output/not_found.csv")
 
     print(f"\n🎉 Done! Deleted: {success} | Failed: {failed}")

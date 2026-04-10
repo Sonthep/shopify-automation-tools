@@ -7,10 +7,11 @@ Usage:
     py fetch_product_gids.py
 """
 import json
+import os
 from utils import make_headers, gql, API_URL
 
 HEADERS     = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
-OUTPUT_FILE = "product_gids.json"
+OUTPUT_FILE = os.path.join(os.path.dirname(__file__), "cache", "product_gids.json")
 
 QUERY = """
 query getProducts($cursor: String) {

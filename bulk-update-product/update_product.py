@@ -50,7 +50,7 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, dict, list]:
     not_found = [s for s, g in gid_map.items() if g is None]
     if not_found:
         print(f"Not found: {not_found}")
-        pd.DataFrame({"sku": not_found}).to_csv("not_found.csv", index=False)
+        pd.DataFrame({"sku": not_found}).to_csv(os.path.join(os.path.dirname(__file__), "output", "not_found.csv"), index=False)
 
     sku_qty_map: dict[str, str] = {}
     price_entries: list = []
@@ -242,7 +242,7 @@ def read_inventory_csv(filepath: str) -> list[dict]:
     return rows
 
 
-INVENTORY_CACHE_FILE = os.path.join(os.path.dirname(__file__), "inventory_item_ids.json")
+INVENTORY_CACHE_FILE = os.path.join(os.path.dirname(__file__), "cache", "inventory_item_ids.json")
 
 
 def get_inventory_item_ids_batch(skus: list, batch_size: int = 50) -> dict:
@@ -373,7 +373,7 @@ def update_inventory(rows: list[dict]):
         return
 
     print(f"Building inventory JSONL for {len(quantities)} items...")
-    jsonl_file = os.path.join(os.path.dirname(__file__), "inventory_bulk.jsonl")
+    jsonl_file = os.path.join(os.path.dirname(__file__), "output", "inventory_bulk.jsonl")
     build_inventory_jsonl(quantities, jsonl_file)
 
     target = create_staged_upload("inventory_bulk.jsonl")
@@ -421,8 +421,10 @@ if __name__ == "__main__":
         os.remove(INVENTORY_CACHE_FILE)
         print(f"Cache deleted: {INVENTORY_CACHE_FILE}")
 
-    CSV_FILE   = os.path.join(base_dir, "data/update_price_test.csv")
-    JSONL_FILE = os.path.join(base_dir, "bulk.jsonl")
+    CSV_FILE   = os.path.join(base_dir, "data/update_price.csv")
+    os.makedirs(os.path.join(base_dir, "output"), exist_ok=True)
+    os.makedirs(os.path.join(base_dir, "cache"), exist_ok=True)
+    JSONL_FILE = os.path.join(base_dir, "output", "bulk.jsonl")
 
     sku_qty_map: dict  = {}
     price_entries: list = []
@@ -449,7 +451,7 @@ if __name__ == "__main__":
         # ── 1b. Price / compareAtPrice update (requires separate bulk op) ──
         if price_entries:
             print(f"\nPrice update for {len(price_entries)} variant(s)...")
-            price_jsonl = os.path.join(base_dir, "price_bulk.jsonl")
+            price_jsonl = os.path.join(base_dir, "output", "price_bulk.jsonl")
             build_price_jsonl(price_entries, price_jsonl)
             target = create_staged_upload("price_bulk.jsonl")
             if not target:

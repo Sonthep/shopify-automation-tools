@@ -24,9 +24,9 @@ from utils import make_headers, gql, get_product_gids_by_skus, API_URL
 HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 
 # ── Config ────────────────────────────────────────────────────
-CSV_FILE       = os.path.join(os.path.dirname(__file__), "update_power_type.csv")
-JSONL_FILE     = os.path.join(os.path.dirname(__file__), "part_type_bulk.jsonl")
-GID_CACHE_FILE = os.path.join(os.path.dirname(__file__), "product_gids.json")
+CSV_FILE       = os.path.join(os.path.dirname(__file__), "data", "update_power_type.csv")
+JSONL_FILE     = os.path.join(os.path.dirname(__file__), "output", "part_type_bulk.jsonl")
+GID_CACHE_FILE = os.path.join(os.path.dirname(__file__), "cache", "product_gids.json")
 COL_SKU        = "Variant SKU"
 
 # metafield columns to update: (csv_column, namespace, key, type)
@@ -62,7 +62,7 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> int:
     not_found = [s for s, g in gid_map.items() if g is None]
     if not_found:
         print(f"⚠️  Not found ({len(not_found)}): {not_found[:10]}")
-        pd.DataFrame({"sku": not_found}).to_csv("not_found_metafield.csv", index=False)
+        pd.DataFrame({"sku": not_found}).to_csv(os.path.join(os.path.dirname(__file__), "output", "not_found_metafield.csv"), index=False)
 
     count = 0
     with open(jsonl_file, "w", encoding="utf-8") as f:
@@ -176,6 +176,8 @@ def poll_status(interval: int = 15) -> str | None:
 
 # ── Main ──────────────────────────────────────────────────────
 if __name__ == "__main__":
+    os.makedirs(os.path.join(os.path.dirname(__file__), "output"), exist_ok=True)
+    os.makedirs(os.path.join(os.path.dirname(__file__), "cache"), exist_ok=True)
     count = build_jsonl(CSV_FILE, JSONL_FILE)
     if count == 0:
         print("Nothing to update.")
