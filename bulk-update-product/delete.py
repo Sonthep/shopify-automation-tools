@@ -1,7 +1,7 @@
 import pandas as pd
 import time
 import os
-from utils import make_headers, get_product_gids_by_skus, gql, API_URL
+from utils import make_headers, get_product_gids_by_skus, gql, read_csv_auto, API_URL
 
 HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     base_dir = os.path.dirname(__file__)
     CSV_FILE = os.path.join(base_dir, "data", "delete_1469.csv")  # ต้องมี column "Variant SKU"
 
-    df = pd.read_csv(CSV_FILE)
+    df = read_csv_auto(CSV_FILE)
     print(f"Columns found: {df.columns.tolist()}")
 
     sku_col = "Variant SKU" if "Variant SKU" in df.columns else "sku"

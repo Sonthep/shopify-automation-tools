@@ -5,7 +5,7 @@ import time
 import os
 import requests
 import pandas as pd
-from utils import make_headers, get_product_gids_by_skus, gql, API_URL
+from utils import make_headers, get_product_gids_by_skus, gql, read_csv_auto, API_URL
 
 # Fix Unicode/emoji output on Windows terminals (e.g. CP874)
 if hasattr(sys.stdout, "reconfigure"):
@@ -180,7 +180,7 @@ def poll_until_done(interval=5):
 
 # ===== BUILD JSONL FROM CSV =====
 def build_jsonl(csv_path, jsonl_path):
-    df = pd.read_csv(csv_path)
+    df = read_csv_auto(csv_path)
     print(f"Columns found: {df.columns.tolist()}")
 
     if SKU_COL not in df.columns:

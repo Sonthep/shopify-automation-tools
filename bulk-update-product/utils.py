@@ -3,12 +3,19 @@ Shared utilities for Shopify GraphQL scripts.
 """
 import json
 import os
+import sys
 import time
 import requests
 import pandas as pd
 from dotenv import load_dotenv
 
-load_dotenv()
+# Ensure UTF-8 output on Windows (Thai terminal uses cp874 by default)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+load_dotenv(override=True)
 
 SHOP    = os.getenv("SHOP_NAME")
 API_VER = "2026-01"
@@ -39,23 +46,23 @@ def gql(api_url: str, headers: dict, query: str, variables: dict = None) -> dict
         try:
             body = res.json()
         except ValueError:
-            print(f"  ❌ Invalid JSON response: {res.text[:200]}")
+            print(f"  [ERR] Invalid JSON response: {res.text[:200]}")
             return None
         if res.status_code != 200:
-            print(f"  ❌ HTTP {res.status_code}: {body}")
+            print(f"  [ERR] HTTP {res.status_code}: {body}")
             return None
         errors = body.get("errors", [])
         if errors:
             # Check if ALL errors are throttling errors — retry with backoff
             if all(e.get("extensions", {}).get("code") == "THROTTLED" for e in errors):
-                print(f"  ⏳ Throttled — retrying in {wait:.0f}s (attempt {attempt + 1}/{max_retries})")
+                print(f"  [WAIT] Throttled -- retrying in {wait:.0f}s (attempt {attempt + 1}/{max_retries})")
                 time.sleep(wait)
                 wait = min(wait * 2, 60)
                 continue
-            print(f"  ❌ GraphQL errors: {errors}")
+            print(f"  [ERR] GraphQL errors: {errors}")
             return None
         return body
-    print(f"  ❌ Gave up after {max_retries} retries (throttle)")
+    print(f"  [ERR] Gave up after {max_retries} retries (throttle)")
     return None
 
 
@@ -67,6 +74,16 @@ def get_val(row: pd.Series, col: str) -> str | None:
     if pd.isna(val):
         return None
     return str(val).strip() or None
+
+
+def read_csv_auto(path: str, **kwargs) -> pd.DataFrame:
+    """Read CSV with automatic encoding detection (utf-8-sig → cp874 → latin-1)."""
+    for enc in ("utf-8-sig", "cp874", "latin-1"):
+        try:
+            return pd.read_csv(path, encoding=enc, **kwargs)
+        except (UnicodeDecodeError, ValueError):
+            continue
+    raise ValueError(f"Cannot decode CSV file: {path}")
 
 
 def get_product_gids_by_skus(

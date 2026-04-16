@@ -1,0 +1,4 @@
+name,namespace,key,type,description,filterable
+Power (W),specs,power_watt,number_integer,Power consumption in watts,true
+Weight (kg),specs,weight_kg,number_decimal,Product weight in kilograms,true
+Power Type,specs,power_type,single_line_text_field,Electric or Gas,true

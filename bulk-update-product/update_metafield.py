@@ -19,12 +19,12 @@ import time
 import os
 import requests
 import pandas as pd
-from utils import make_headers, gql, get_product_gids_by_skus, API_URL
+from utils import make_headers, gql, get_product_gids_by_skus, read_csv_auto, API_URL
 
 HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 
 # ── Config ────────────────────────────────────────────────────
-CSV_FILE       = os.path.join(os.path.dirname(__file__), "data", "update_power_type.csv")
+CSV_FILE       = os.path.join(os.path.dirname(__file__), "data", "update_good_id.csv")
 JSONL_FILE     = os.path.join(os.path.dirname(__file__), "output", "part_type_bulk.jsonl")
 GID_CACHE_FILE = os.path.join(os.path.dirname(__file__), "cache", "product_gids.json")
 COL_SKU        = "Variant SKU"
@@ -33,12 +33,13 @@ COL_SKU        = "Variant SKU"
 METAFIELD_COLS = [
     ("part_type",  "custom", "part_type",  "single_line_text_field"),
     ("power_type", "custom", "power_type", "single_line_text_field"),
+    ("good_id",    "custom", "good_id",    "single_line_text_field"),
 ]
 
 
 # ── Build JSONL ───────────────────────────────────────────────
 def build_jsonl(csv_file: str, jsonl_file: str) -> int:
-    df = pd.read_csv(csv_file)
+    df = read_csv_auto(csv_file)
     print(f"Columns: {df.columns.tolist()}")
 
     if COL_SKU not in df.columns:

@@ -1,7 +1,7 @@
 import requests
 import pandas as pd
 import time
-from utils import make_headers, gql as _gql, get_val as _get_val, API_URL
+from utils import make_headers, gql as _gql, get_val as _get_val, read_csv_auto, API_URL
 
 HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 
@@ -293,7 +293,7 @@ if __name__ == "__main__":
     base_dir = os.path.dirname(__file__)
     CSV_FILE = os.path.join(base_dir, "test_create.csv")
 
-    df = pd.read_csv(CSV_FILE)
+    df = read_csv_auto(CSV_FILE)
     df.columns = df.columns.str.strip()
     print(f"Columns found: {df.columns.tolist()}")
     print(f"📋 {len(df)} rows to create")

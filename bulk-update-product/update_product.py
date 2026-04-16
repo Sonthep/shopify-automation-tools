@@ -8,7 +8,7 @@ import argparse
 import pandas as pd
 import requests
 
-from utils import make_headers, get_product_gids_by_skus, get_variant_gids_by_skus, get_val, gql, API_URL
+from utils import make_headers, get_product_gids_by_skus, get_variant_gids_by_skus, get_val, gql, read_csv_auto, API_URL
 
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
@@ -34,7 +34,7 @@ COL = {
 # ── Product update (Bulk API) ─────────────────────────────────
 
 def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, dict, list]:
-    df = pd.read_csv(csv_file)
+    df = read_csv_auto(csv_file)
     print(f"Columns found: {df.columns.tolist()}")
 
     sku_col = COL["sku"] if COL["sku"] in df.columns else "sku"
