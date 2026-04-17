@@ -2,13 +2,13 @@
 // CONFIG
 // ============================================================
 const SHOP = "sevenfive-4062.myshopify.com";
-const CLIENT_ID = "696e1e9162c702cc07c2f94a1beacf8a";
-const CLIENT_SECRET = "REDACTED_SECRET";
+const CLIENT_ID = "";
+const CLIENT_SECRET = "";
 const LOCATION_ID = "gid://shopify/Location/85456027847";
 const SHEET_NAME = "Inventory";
 const LOG_SHEET_NAME = "Log run script";
 
-const CHUNK_SIZE = 50;
+const CHUNK_SIZE = 100;
 const MAX_RUNTIME_MS = 4.5 * 60 * 1000;
 const RESUME_AFTER_MS = 60 * 1000;
 
@@ -22,12 +22,32 @@ const PROP_RUN_DATE      = "INV_RUN_DATE";
 const PROP_RUN_START     = "INV_RUN_START";
 const PROP_RUN_STATUS    = "INV_RUN_STATUS"; // "running" | "completed" | "failed"
 
-const RESUME_HANDLER = "updateInventory";
+const CACHE_SHEET_NAME = "GoodID Cache";
+const RESUME_HANDLER   = "updateInventory";
+const INV_ITEM_ID_COL  = 4; // col D ใน sheet Inventory — cached InventoryItemId
 
 // ============================================================
-// DAILY ENTRY
+// MANUAL RUN — กดปุ่มจาก editor ได้เสมอ ไม่มี skip
 // ============================================================
-function startDailyInventoryJob() {
+function runInventoryNow() {
+  const props = PropertiesService.getScriptProperties();
+  const tz    = Session.getScriptTimeZone() || "Asia/Bangkok";
+
+  Logger.log("[MANUAL] Force-resetting all state and starting job...");
+  resetState_();
+
+  props.setProperty(PROP_RUN_DATE,   Utilities.formatDate(new Date(), tz, "yyyy-MM-dd"));
+  props.setProperty(PROP_RUN_START,  new Date().toISOString());
+  props.setProperty(PROP_RUN_STATUS, "running");
+
+  updateInventory();
+}
+
+// ============================================================
+// TRIGGER ENTRY — ใช้กับ Time-based trigger เท่านั้น
+//   จะ skip ถ้า: กำลัง running / completed วันนี้แล้ว / pause รอ resume
+// ============================================================
+function dailyInventoryTrigger() {
   const props     = PropertiesService.getScriptProperties();
   const tz        = Session.getScriptTimeZone() || "Asia/Bangkok";
   const todayKey  = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd");
@@ -35,19 +55,10 @@ function startDailyInventoryJob() {
   const runDate   = props.getProperty(PROP_RUN_DATE);
   const runStatus = props.getProperty(PROP_RUN_STATUS);
 
-  // กำลัง run อยู่ → skip
-  if (isRunning) {
-    Logger.log("[SKIP] Job is already running.");
-    return;
-  }
+  if (isRunning) { Logger.log("[SKIP] Job is already running."); return; }
+  if (runDate === todayKey && runStatus === "completed") { Logger.log("[SKIP] Already completed for " + todayKey); return; }
+  if (runDate === todayKey && runStatus === "running")   { Logger.log("[SKIP] Job is paused — waiting for resume trigger."); return; }
 
-  // วันนี้ completed แล้ว → skip
-  if (runDate === todayKey && runStatus === "completed") {
-    Logger.log("[SKIP] Already completed for " + todayKey);
-    return;
-  }
-
-  // วันใหม่ หรือ failed/ค้าง → reset แล้วเริ่มใหม่
   if (runDate !== todayKey) {
     Logger.log("[START] New day — clearing state from " + (runDate || "none"));
   } else {
@@ -103,34 +114,23 @@ function updateInventory() {
       // ใกล้หมดเวลา → save progress + schedule resume
       if (Date.now() - startTime > MAX_RUNTIME_MS) {
         saveProgress_(props, nextIndex, totalSuccess, totalSkip);
-        props.deleteProperty(PROP_IS_RUNNING); // ปลด lock ก่อน resume trigger จะยิง
+        props.deleteProperty(PROP_IS_RUNNING);
         scheduleResume_();
         Logger.log("[PAUSE] Saved at index " + nextIndex + " — resume trigger scheduled");
         return;
       }
 
-      // ── ดึง inventory item IDs ──
-      const chunk = rows.slice(nextIndex, nextIndex + CHUNK_SIZE);
-      let skuMap  = {};
-      try {
-        skuMap = getInventoryItemsBySKUs_(chunk.map(function(r) { return r.sku; }));
-      } catch (err) {
-        Logger.log("[ERROR] getInventoryItemsBySKUs_ at index " + nextIndex + ": " + err.message);
-        totalSkip += chunk.length;
-        nextIndex += CHUNK_SIZE;
-        saveProgress_(props, nextIndex, totalSuccess, totalSkip);
-        Utilities.sleep(2000);
-        continue;
-      }
+      const chunk     = rows.slice(nextIndex, nextIndex + CHUNK_SIZE);
+      const quantities         = [];
+      const quantityRowIndices = [];
 
-      // ── จับคู่ SKU → quantity ──
-      const quantities = [];
       chunk.forEach(function(r) {
-        if (skuMap[r.sku]) {
-          quantities.push({ inventoryItemId: skuMap[r.sku], quantity: r.quantity });
+        if (r.inventoryItemId) {
+          quantities.push({ inventoryItemId: r.inventoryItemId, quantity: r.quantity });
+          quantityRowIndices.push(r.rowIndex);
         } else {
           totalSkip++;
-          Logger.log("[SKIP] SKU not found: " + r.sku);
+          Logger.log("[SKIP] No InventoryItemId in col D — SKU: '" + r.sku + "' | GoodID: '" + r.goodId + "' | Row: " + r.rowIndex + " (run refreshGoodIdCache first)");
         }
       });
 
@@ -147,10 +147,25 @@ function updateInventory() {
             totalSkip += quantities.length;
           } else if (userErrors.length > 0) {
             Logger.log("[ERROR] User errors: " + JSON.stringify(userErrors));
+            // clear col D สำหรับ entry ที่ Shopify บอกว่า "inventory item could not be found"
+            const clearRowIndices = [];
+            userErrors.forEach(function(e) {
+              if (e.field && e.field[2] !== undefined &&
+                  String(e.message).indexOf("could not be found") !== -1) {
+                const idx = Number(e.field[2]);
+                if (!isNaN(idx) && quantityRowIndices[idx]) {
+                  clearRowIndices.push(quantityRowIndices[idx]);
+                }
+              }
+            });
+            if (clearRowIndices.length > 0) {
+              clearCachedInventoryItemIds_(sheet, clearRowIndices);
+              Logger.log("[CACHE] Cleared " + clearRowIndices.length + " invalid IDs from col D — run refreshGoodIdCache to fix");
+            }
             totalSkip += quantities.length;
           } else {
             totalSuccess += quantities.length;
-            Logger.log("[OK] Updated " + quantities.length + " SKUs (index " + nextIndex + "–" + (nextIndex + chunk.length - 1) + ")");
+            Logger.log("[OK] Updated " + quantities.length + " items (index " + nextIndex + "–" + (nextIndex + chunk.length - 1) + ")");
           }
         } catch (err) {
           Logger.log("[ERROR] setInventoryQuantitiesBatch_ at index " + nextIndex + ": " + err.message);
@@ -235,6 +250,291 @@ function getInventoryItemsBySKUs_(skus) {
   }
 
   return map;
+}
+
+// ============================================================
+// GET INVENTORY ITEM IDs BY Good ID METAFIELD
+//   1. อ่าน cache จาก sheet "GoodID Cache" ก่อน
+//   2. scan Shopify เฉพาะ GoodID ที่ยังไม่อยู่ใน cache
+//   3. บันทึก hit ใหม่กลับลง cache
+// ============================================================
+function getInventoryItemsByGoodIds_(targetGoodIds) {
+  const targetSet = {};
+  targetGoodIds.forEach(function(id) {
+    if (id) targetSet[String(id).trim()] = true;
+  });
+  if (Object.keys(targetSet).length === 0) return {};
+
+  // ── 1. อ่าน cache ──
+  const cache = loadGoodIdCache_();
+
+  const map     = {};
+  const missing = [];
+  Object.keys(targetSet).forEach(function(id) {
+    if (cache[id]) {
+      map[id] = cache[id];
+    } else {
+      missing.push(id);
+    }
+  });
+
+  Logger.log("[GOODID] Cache hit: " + Object.keys(map).length + " | Miss (scan needed): " + missing.length);
+  if (missing.length === 0) return map;
+
+  // ── 2. scan Shopify เฉพาะที่ยังไม่มีใน cache ──
+  const missingSet = {};
+  missing.forEach(function(id) { missingSet[id] = true; });
+
+  var cursor  = null;
+  var found   = 0;
+  var total   = missing.length;
+  const newEntries = {};
+
+  do {
+    const afterClause = cursor ? ', after: "' + cursor + '"' : "";
+    const query = [
+      "{",
+      "  products(first: 250" + afterClause + ") {",
+      "    pageInfo { hasNextPage endCursor }",
+      "    edges {",
+      "      node {",
+      '        metafield(namespace: "custom", key: "good_id") { value }',
+      "        variants(first: 1) {",
+      "          edges { node { inventoryItem { id } } }",
+      "        }",
+      "      }",
+      "    }",
+      "  }",
+      "}"
+    ].join("\n");
+
+    const res = callGraphQL_(query);
+    if (!res || !res.data || !res.data.products) break;
+
+    const products = res.data.products;
+    products.edges.forEach(function(e) {
+      const node   = e.node;
+      const mf     = node.metafield;
+      const goodId = mf ? String(mf.value || "").trim() : null;
+      if (!goodId || !missingSet[goodId]) return;
+      const edges  = node.variants && node.variants.edges;
+      if (edges && edges.length > 0) {
+        const invItemId = edges[0].node.inventoryItem && edges[0].node.inventoryItem.id;
+        if (invItemId && !map[goodId]) {
+          map[goodId]         = invItemId;
+          newEntries[goodId]  = invItemId;
+          found++;
+        }
+      }
+    });
+
+    if (found >= total) break;
+    cursor = products.pageInfo.hasNextPage ? products.pageInfo.endCursor : null;
+
+  } while (cursor);
+
+  Logger.log("[GOODID] Scanned — found " + found + "/" + total + " missing IDs");
+
+  // ── 3. save hit ใหม่กลับลง cache ──
+  if (Object.keys(newEntries).length > 0) {
+    saveGoodIdCache_(newEntries);
+  }
+
+  return map;
+}
+
+// ============================================================
+// CACHE HELPERS — Sheet "GoodID Cache"
+//   Columns: A=GoodID | B=SKU | C=InventoryItemId | D=CachedAt
+//   (รองรับ format เก่า 3 col: A=GoodID | B=InventoryItemId | C=CachedAt)
+// ============================================================
+function loadGoodIdCache_() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CACHE_SHEET_NAME);
+  const cache = {}; // goodId → inventoryItemId
+  if (!sheet || sheet.getLastRow() < 2) return cache;
+
+  const lastCol = sheet.getLastColumn();
+  const data    = sheet.getRange(2, 1, sheet.getLastRow() - 1, lastCol).getValues();
+  data.forEach(function(row) {
+    const goodId = String(row[0] || "").trim();
+    const col2   = String(row[1] || "").trim();
+    const col3   = lastCol >= 3 ? String(row[2] || "").trim() : "";
+    // col3 เป็น InventoryItemId (4-col format) หรือ col2 เป็น InventoryItemId (3-col format เก่า)
+    const invItem = col3.indexOf("gid://") === 0 ? col3
+                  : col2.indexOf("gid://") === 0 ? col2
+                  : "";
+    if (goodId && invItem) cache[goodId] = invItem;
+  });
+  return cache;
+}
+
+function saveGoodIdCache_(newEntries) {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet   = ss.getSheetByName(CACHE_SHEET_NAME);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(CACHE_SHEET_NAME);
+    sheet.appendRow(["GoodID", "InventoryItemId", "CachedAt"]);
+    sheet.setFrozenRows(1);
+  }
+
+  // อ่าน row เดิมเพื่อ update แทนที่ถ้ามี key ซ้ำ
+  const lastRow  = sheet.getLastRow();
+  const existing = {}; // goodId → row number
+  if (lastRow >= 2) {
+    const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    ids.forEach(function(r, i) {
+      const id = String(r[0] || "").trim();
+      if (id) existing[id] = i + 2; // 1-indexed
+    });
+  }
+
+  const now = new Date().toISOString();
+  Object.keys(newEntries).forEach(function(goodId) {
+    const invItemId = newEntries[goodId];
+    if (existing[goodId]) {
+      // update row เดิม
+      sheet.getRange(existing[goodId], 2, 1, 2).setValues([[invItemId, now]]);
+    } else {
+      // append row ใหม่
+      sheet.appendRow([goodId, invItemId, now]);
+    }
+  });
+
+  Logger.log("[CACHE] Saved " + Object.keys(newEntries).length + " entries to '" + CACHE_SHEET_NAME + "'");
+}
+
+// ============================================================
+// REFRESH GOOD ID CACHE — scan ทุก product แล้ว fill col D ใน Inventory sheet
+//   รันครั้งแรก หรือเมื่อเพิ่มสินค้าใหม่
+//   1. Scan ทุก product → สร้าง skuMap + goodIdMap + cacheRows (ทุก variant)
+//   2. Match กับ Inventory sheet → เขียน InventoryItemId ลง col D
+//   3. บันทึก GoodID Cache sheet (InventoryItemId เป็น primary)
+// ============================================================
+function refreshGoodIdCache() {
+  Logger.log("[CACHE] Starting full product scan...");
+
+  const skuMap    = {}; // sku → inventoryItemId
+  const goodIdMap = {}; // goodId → inventoryItemId
+  const cacheRows = []; // [invItemId, sku, goodId] — ทุก variant รวมถึงที่ไม่มี SKU/GoodID
+  var cursor      = null;
+  var productCount = 0;
+
+  // ── 1. scan ทุก product ──
+  do {
+    const afterClause = cursor ? ', after: "' + cursor + '"' : "";
+    const query = [
+      "{",
+      "  products(first: 250" + afterClause + ") {",
+      "    pageInfo { hasNextPage endCursor }",
+      "    edges {",
+      "      node {",
+      '        metafield(namespace: "custom", key: "good_id") { value }',
+      "        variants(first: 100) {",
+      "          edges {",
+      "            node {",
+      "              sku",
+      "              inventoryItem { id }",
+      "            }",
+      "          }",
+      "        }",
+      "      }",
+      "    }",
+      "  }",
+      "}"
+    ].join("\n");
+
+    const res = callGraphQL_(query);
+    if (!res || !res.data || !res.data.products) break;
+
+    const products = res.data.products;
+    products.edges.forEach(function(e) {
+      const node     = e.node;
+      const mf       = node.metafield;
+      const goodId   = mf ? String(mf.value || "").trim() : "";
+      const varEdges = node.variants && node.variants.edges;
+      if (!varEdges || varEdges.length === 0) return;
+
+      varEdges.forEach(function(ve) {
+        const v         = ve.node;
+        const sku       = String(v.sku || "").trim();
+        const invItemId = v.inventoryItem ? v.inventoryItem.id : null;
+        if (!invItemId) return;
+
+        // build lookup maps
+        if (sku)    skuMap[sku]       = invItemId;
+        if (goodId) goodIdMap[goodId] = invItemId;
+
+        // เก็บทุก variant — GoodID เป็น col A (blank ถ้าไม่มี)
+        cacheRows.push([goodId, sku, invItemId]);
+      });
+      productCount++;
+    });
+
+    cursor = products.pageInfo.hasNextPage ? products.pageInfo.endCursor : null;
+
+  } while (cursor);
+
+  Logger.log("[CACHE] Scanned " + productCount + " products | Total variants: " + cacheRows.length + " | SKUs: " + Object.keys(skuMap).length + " | GoodIDs: " + Object.keys(goodIdMap).length);
+
+  // ── 2. fill col D ใน Inventory sheet ──
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const invSheet = ss.getSheetByName(SHEET_NAME);
+  if (!invSheet || invSheet.getLastRow() < 2) {
+    Logger.log("[CACHE] Inventory sheet is empty — skipping col D fill");
+  } else {
+    const data    = invSheet.getRange(2, 1, invSheet.getLastRow() - 1, 4).getValues();
+    const updates = [];
+    var filled = 0;
+    var alreadyHad = 0;
+
+    data.forEach(function(row, i) {
+      const sku      = String(row[0] || "").trim();
+      const goodId   = String(row[2] || "").trim();
+      const existing = String(row[3] || "").trim();
+
+      // ถ้ามีอยู่แล้วและ valid → ไม่ต้อง overwrite
+      if (/^gid:\/\/shopify\/InventoryItem\/\d+$/.test(existing)) {
+        alreadyHad++;
+        return;
+      }
+
+      var invItemId = null;
+      if (sku && skuMap[sku])              invItemId = skuMap[sku];
+      else if (goodId && goodIdMap[goodId]) invItemId = goodIdMap[goodId];
+
+      if (invItemId) {
+        updates.push({ rowIndex: i + 2, invItemId: invItemId });
+        filled++;
+      }
+    });
+
+    updates.forEach(function(u) {
+      invSheet.getRange(u.rowIndex, INV_ITEM_ID_COL).setValue(u.invItemId);
+    });
+
+    Logger.log("[CACHE] Inventory col D — filled: " + filled + " | already had: " + alreadyHad + " | total rows: " + data.length);
+  }
+
+  // ── 3. เขียนทับ GoodID Cache sheet (InventoryItemId เป็น primary) ──
+  var cacheSheet = ss.getSheetByName(CACHE_SHEET_NAME);
+  if (!cacheSheet) {
+    cacheSheet = ss.insertSheet(CACHE_SHEET_NAME);
+    cacheSheet.setFrozenRows(1);
+  } else {
+    cacheSheet.clearContents();
+  }
+
+  cacheSheet.appendRow(["GoodID", "SKU", "InventoryItemId", "CachedAt"]);
+  const tz  = Session.getScriptTimeZone() || "Asia/Bangkok";
+  const now = Utilities.formatDate(new Date(), tz, "dd/MM/yyyy HH:mm");
+  if (cacheRows.length > 0) {
+    const rowsWithTime = cacheRows.map(function(r) { return [r[0], r[1], r[2], now]; });
+    cacheSheet.getRange(2, 1, rowsWithTime.length, 4).setValues(rowsWithTime);
+  }
+
+  Logger.log("[CACHE] Refresh complete — " + cacheRows.length + " variants written to '" + CACHE_SHEET_NAME + "'");
 }
 
 // ============================================================
@@ -354,12 +654,47 @@ function getValidRows_(sheet) {
   const data = sheet.getDataRange().getValues();
   const rows = [];
   for (var i = 1; i < data.length; i++) {
-    const sku = String(data[i][0] || "").trim();
-    const qty = parseInt(data[i][1], 10);
-    if (!sku || isNaN(qty)) continue;
-    rows.push({ sku: sku, quantity: qty });
+    const sku       = String(data[i][0] || "").trim();
+    const qty       = parseInt(data[i][1], 10);
+    const goodId    = String(data[i][2] || "").trim();
+    const invItemIdRaw = String(data[i][3] || "").trim(); // col D — cached InventoryItemId
+    // ตรวจ format: ต้องเป็น gid://shopify/InventoryItem/ตัวเลข เท่านั้น — ป้องกัน ID ผิดประเภท
+    const invItemId = /^\/\/shopify\/InventoryItem\/\d+$/.test(invItemIdRaw.replace("gid:","")) ? invItemIdRaw : "";
+    if (isNaN(qty)) continue;
+    if (!sku && !goodId && !invItemId) continue;
+    rows.push({ sku: sku, quantity: qty, goodId: goodId, inventoryItemId: invItemId, rowIndex: i + 1 });
   }
   return rows;
+}
+
+// ============================================================
+// WRITE BACK — บันทึก InventoryItemId ลง sheet col D
+//   ครั้งต่อไปจะ skip lookup ได้ทันที
+// ============================================================
+function writeBackInventoryItemIds_(sheet, updates) {
+  updates.forEach(function(u) {
+    sheet.getRange(u.rowIndex, INV_ITEM_ID_COL).setValue(u.inventoryItemId);
+  });
+  Logger.log("[CACHE] Wrote back " + updates.length + " InventoryItemIds to sheet col D");
+}
+
+function clearCachedInventoryItemIds_(sheet, rowIndices) {
+  rowIndices.forEach(function(rowIndex) {
+    sheet.getRange(rowIndex, INV_ITEM_ID_COL).clearContent();
+  });
+}
+
+// รัน manual เพื่อ clear InventoryItemId cache ทั้งหมดใน col D แล้ว re-lookup ใหม่
+function clearSheetInventoryItemIds() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) {
+    Logger.log("[CACHE] Sheet '" + SHEET_NAME + "' is empty.");
+    return;
+  }
+  const lastRow = sheet.getLastRow();
+  sheet.getRange(2, INV_ITEM_ID_COL, lastRow - 1, 1).clearContent();
+  Logger.log("[CACHE] Cleared all InventoryItemId cache from col D (" + (lastRow - 1) + " rows) — next run will re-lookup");
 }
 
 // ============================================================
@@ -417,7 +752,7 @@ function resetState_() {
 function clearState_() {
   const props = PropertiesService.getScriptProperties();
   [PROP_NEXT_INDEX, PROP_TOTAL_SUCCESS, PROP_TOTAL_SKIP,
-   PROP_IS_RUNNING, PROP_RUN_DATE, PROP_RUN_START]
+   PROP_IS_RUNNING, PROP_RUN_START]   // คง PROP_RUN_DATE ไว้ เพื่อให้ startDailyInventoryJob ตรวจสอบ "completed" ได้ถูกต้อง
     .forEach(function(k) { props.deleteProperty(k); });
   clearResumeTriggers_();
 }
@@ -426,6 +761,27 @@ function clearState_() {
 function resetInventoryProgress() {
   resetState_();
   Logger.log("Inventory progress reset complete.");
+}
+
+// ============================================================
+// MANUAL RUN — force start ได้เสมอ (ไม่ว่าจะ completed / failed / ค้าง)
+//   Force-reset state ทั้งหมด แล้วเริ่มใหม่
+//   (LockService ใน updateInventory จะป้องกัน concurrent run เอง)
+// ============================================================
+function manualRunInventoryJob() {
+  const props = PropertiesService.getScriptProperties();
+  const tz    = Session.getScriptTimeZone() || "Asia/Bangkok";
+
+  Logger.log("[MANUAL] Force-resetting all state and starting job...");
+
+  // Force clear ทุก property รวมถึง IS_RUNNING ที่อาจค้างอยู่
+  resetState_();
+
+  props.setProperty(PROP_RUN_DATE,   Utilities.formatDate(new Date(), tz, "yyyy-MM-dd"));
+  props.setProperty(PROP_RUN_START,  new Date().toISOString());
+  props.setProperty(PROP_RUN_STATUS, "running");
+
+  updateInventory();
 }
 
 // ============================================================
@@ -450,6 +806,70 @@ function checkSKU() {
   Logger.log(JSON.stringify(res, null, 2));
 }
 
+function checkGoodId() {
+  const testGoodId = "GID-001";
+  Logger.log("[checkGoodId] Searching Good ID: " + testGoodId);
+
+  let found = false;
+  let cursor = null;
+  let page = 0;
+
+  do {
+    page++;
+    const afterClause = cursor ? ', after: "' + cursor + '"' : "";
+    const rawQuery = [
+      "{",
+      '  products(first: 250' + afterClause + ') {',
+      "    pageInfo { hasNextPage endCursor }",
+      "    edges {",
+      "      node {",
+      "        title",
+      '        metafield(namespace: "custom", key: "good_id") { value }',
+      "        variants(first: 10) {",
+      "          edges { node { sku inventoryItem { id } } }",
+      "        }",
+      "      }",
+      "    }",
+      "  }",
+      "}"
+    ].join("\n");
+
+    const raw = callGraphQL_(rawQuery);
+
+    if (!raw || !raw.data || !raw.data.products) {
+      Logger.log("[checkGoodId] GraphQL error: " + JSON.stringify(raw, null, 2));
+      break;
+    }
+
+    const edges = raw.data.products.edges;
+    const pageInfo = raw.data.products.pageInfo;
+
+    edges.forEach(function(e) {
+      const node  = e.node;
+      const mfVal = node.metafield ? node.metafield.value : null;
+
+      if (mfVal === testGoodId) {
+        found = true;
+        Logger.log("[checkGoodId] ✅ FOUND — Product: " + node.title + " | good_id: " + mfVal);
+        if (node.variants && node.variants.edges) {
+          node.variants.edges.forEach(function(ve) {
+            const v = ve.node;
+            Logger.log("  → SKU: " + (v.sku || "(empty)") + " | InventoryItem: " + (v.inventoryItem ? v.inventoryItem.id : "(none)"));
+          });
+        }
+      }
+    });
+
+    cursor = pageInfo.hasNextPage ? pageInfo.endCursor : null;
+
+  } while (cursor);
+
+  if (!found) {
+    Logger.log("[checkGoodId] ❌ NOT FOUND — ไม่พบ product ที่มี custom.good_id = '" + testGoodId + "'");
+  }
+}
+
+
 function debugTriggers() {
   const triggers = ScriptApp.getProjectTriggers();
   Logger.log("Total triggers: " + triggers.length);
@@ -466,4 +886,61 @@ function debugTriggers() {
   Logger.log("RUN_STATUS: "  + props.getProperty("INV_RUN_STATUS"));
   Logger.log("RUN_DATE: "    + props.getProperty("INV_RUN_DATE"));
   Logger.log("NEXT_INDEX: "  + props.getProperty("INV_NEXT_INDEX"));
+}
+
+function getAllProductsWithGoodId() {
+  let cursor = null;
+  let allProducts = [];
+
+  do {
+    const afterClause = cursor ? `, after: "${cursor}"` : "";
+    const query = `
+      {
+        products(first: 250${afterClause}) {
+          pageInfo { hasNextPage endCursor }
+          edges {
+            node {
+              id
+              title
+              metafield(namespace: "custom", key: "good_id") { value }
+              variants(first: 10) {
+                edges {
+                  node {
+                    sku
+                    inventoryItem { id }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const res = callGraphQL_(query);
+    const products = res.data.products;
+
+    products.edges.forEach(function(e) {
+      const p = e.node;
+      const goodId = p.metafield ? p.metafield.value : null;
+
+      p.variants.edges.forEach(function(ve) {
+        const v = ve.node;
+        allProducts.push({
+          productId: p.id,
+          title: p.title,
+          goodId: goodId,
+          sku: v.sku,
+          inventoryItemId: v.inventoryItem ? v.inventoryItem.id : null
+        });
+      });
+    });
+
+    cursor = products.pageInfo.hasNextPage ? products.pageInfo.endCursor : null;
+
+  } while (cursor);
+
+  Logger.log("Total variants: " + allProducts.length);
+  Logger.log(JSON.stringify(allProducts, null, 2));
+  return allProducts;
 }
