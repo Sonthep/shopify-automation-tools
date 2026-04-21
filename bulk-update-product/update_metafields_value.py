@@ -2,16 +2,17 @@
 Bulk-update metafield values on products from a CSV file.
 
 CSV format:
-    - Column 1 : "GID"  (e.g. gid://shopify/Product/123456789)
-    - Remaining: metafield columns named as  "namespace.key"
-                 e.g.  specs.voltage, specs.weight_kg, custom.part_type
+    - Column 1       : "GID"  (e.g. gid://shopify/Product/123456789)
+    - "descriptionHtml": (optional) HTML description ของ product
+    - Remaining        : metafield columns named as  "namespace.key"
+                         e.g.  specs.voltage, specs.weight_kg, custom.part_type
 
     Leave a cell blank to skip that field for that row.
 
 Example CSV:
-    GID,specs.voltage,specs.weight_kg,specs.refrigerant,custom.part_type
-    gid://shopify/Product/123456789,220,12.5,R134a,Compressor
-    gid://shopify/Product/987654321,380,,R410a,
+    GID,descriptionHtml,specs.voltage,custom.part_type
+    gid://shopify/Product/123456789,<p>New desc</p>,220,Compressor
+    gid://shopify/Product/987654321,,380,
 
 Workflow:
     1. อ่าน CSV → แยก namespace/key จาก column header
@@ -39,6 +40,7 @@ base_dir    = os.path.dirname(__file__)
 DEFAULT_CSV = os.path.join(base_dir, "data", "update_metafields_value_robot_coup.csv")
 JSONL_FILE  = os.path.join(base_dir, "output", "metafields_value_bulk.jsonl")
 GID_COL     = "GID"
+DESC_COL    = "descriptionHtml"
 
 
 # ── Step 1: Fetch metafield definition types ──────────────────
@@ -69,15 +71,20 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> int:
         print(f"❌ Column '{GID_COL}' not found.")
         return 0
 
+    has_desc  = DESC_COL in df.columns
+
     # Parse metafield columns (must be "namespace.key" format)
-    meta_cols = [c for c in df.columns if c != GID_COL and "." in c]
-    if not meta_cols:
-        print("❌ No metafield columns found. Columns must be named 'namespace.key' (e.g. specs.voltage)")
+    skip_cols = {GID_COL, DESC_COL}
+    meta_cols = [c for c in df.columns if c not in skip_cols and "." in c]
+    if not meta_cols and not has_desc:
+        print("❌ No updatable columns found. Add 'descriptionHtml' and/or metafield columns named 'namespace.key'")
         return 0
 
-    ignored = [c for c in df.columns if c != GID_COL and "." not in c]
+    ignored = [c for c in df.columns if c not in skip_cols and "." not in c]
     if ignored:
         print(f"⚠️  Ignored columns (no namespace.key format): {ignored}")
+    if has_desc:
+        print(f"  Description column: {DESC_COL}")
 
     print(f"  Metafield columns: {meta_cols}")
 
@@ -132,10 +139,22 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> int:
                     "type":      mf_type,
                 })
 
-            if not metafields:
+            desc_val = None
+            if has_desc:
+                raw_desc = row.get(DESC_COL)
+                if pd.notna(raw_desc) and str(raw_desc).strip():
+                    desc_val = str(raw_desc).strip()
+
+            if not metafields and desc_val is None:
                 continue
 
-            f.write(json.dumps({"input": {"id": gid, "metafields": metafields}}, ensure_ascii=False) + "\n")
+            input_obj = {"id": gid}
+            if desc_val is not None:
+                input_obj["descriptionHtml"] = desc_val
+            if metafields:
+                input_obj["metafields"] = metafields
+
+            f.write(json.dumps({"input": input_obj}, ensure_ascii=False) + "\n")
             count += 1
 
     print(f"\n✅ {count} rows → {jsonl_file}")

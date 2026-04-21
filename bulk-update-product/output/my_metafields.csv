@@ -1,0 +1,41 @@
+﻿name,key
+Compatible With,custom.compatible_with
+FLIPHTML5,custom.fliphtml5
+Good ID,custom.good_id
+LInk pdf,custom.link_pdf
+Product Type,custom.part_type
+Power Type,custom.power_type
+Spec Sheet,custom.spec_sheet
+Bought together products,globo--filter--product_recommendation.bought_together_products
+Complementary products,globo--filter--product_recommendation.complementary_products
+Related products,globo--filter--product_recommendation.related_products
+Complementary products,shopify--discovery--product_recommendation.complementary_products
+Related products,shopify--discovery--product_recommendation.related_products
+Related products settings,shopify--discovery--product_recommendation.related_products_display
+Search product boosts,shopify--discovery--product_search_boost.queries
+Age group,shopify.age-group
+Color,shopify.color-pattern
+Material,shopify.material
+Target gender,shopify.target-gender
+Ampere,specs.ampere
+Certificates,specs.certificates
+Chiller capacity volume (liter),specs.chiller_capacity_liter
+Chiller door amount,specs.chiller_door_amount
+Chiller temperature,specs.chiller_temperature
+Cutting Size,specs.cutting_size
+Depth (mm),specs.depth_mm
+Height (mm),specs.height_mm
+Hz,specs.hz
+Installation,specs.installation
+Made in,specs.made_in
+Material,specs.material
+Product of,specs.product_of
+Refrigerant,specs.refrigerant
+Safety Features,specs.safety_features
+Service warranty,specs.service_warranty
+Spareparts warranty,specs.spareparts_warranty
+Type of Cut,specs.type_of_cut
+Voltage,specs.voltage
+Wattage,specs.wattage
+Weight (kg),specs.weight_kg
+Width (mm),specs.width_mm
