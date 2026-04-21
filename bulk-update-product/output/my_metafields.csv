@@ -17,24 +17,33 @@ Age group,shopify.age-group
 Color,shopify.color-pattern
 Material,shopify.material
 Target gender,shopify.target-gender
+Accessories,specs.accessories
 Ampere,specs.ampere
 Certificates,specs.certificates
 Chiller capacity volume (liter),specs.chiller_capacity_liter
 Chiller door amount,specs.chiller_door_amount
 Chiller temperature,specs.chiller_temperature
+Construction,specs.construction
+Cooking Surface (mm),specs.cooking_surface_mm
 Cutting Size,specs.cutting_size
 Depth (mm),specs.depth_mm
+Energy Type,specs.energy_type
 Height (mm),specs.height_mm
 Hz,specs.hz
 Installation,specs.installation
+Length (mm),specs.length_mm
 Made in,specs.made_in
 Material,specs.material
+Performance Rate,specs.performance_rate
 Product of,specs.product_of
 Refrigerant,specs.refrigerant
 Safety Features,specs.safety_features
 Service warranty,specs.service_warranty
 Spareparts warranty,specs.spareparts_warranty
+Special Features,specs.special_features
+Temperature,specs.temperature
 Type of Cut,specs.type_of_cut
+Usage Time,specs.usage_time
 Voltage,specs.voltage
 Wattage,specs.wattage
 Weight (kg),specs.weight_kg

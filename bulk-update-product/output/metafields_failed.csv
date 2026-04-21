@@ -1,7 +1,2 @@
 name,namespace,key,type,description,filterable
-Cutting Size,specs,cutting_size,single_line_text_field,,TRUE
-Material,specs,material,single_line_text_field,,TRUE
-Installation,specs,installation,single_line_text_field,,TRUE
-Type of Cut,specs,type_of_cut,single_line_text_field,,TRUE
 Safety Features,specs,safety_features,single_line_text_field,,TRUE
-Made in,specs,made_in,single_line_text_field,,TRUE
