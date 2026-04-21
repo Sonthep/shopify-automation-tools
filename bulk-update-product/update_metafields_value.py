@@ -2,21 +2,21 @@
 Bulk-update metafield values on products from a CSV file.
 
 CSV format:
-    - Column 1 : "Variant SKU"
+    - Column 1 : "GID"  (e.g. gid://shopify/Product/123456789)
     - Remaining: metafield columns named as  "namespace.key"
                  e.g.  specs.voltage, specs.weight_kg, custom.part_type
 
-    Leave a cell blank to skip that field for that SKU.
+    Leave a cell blank to skip that field for that row.
 
 Example CSV:
-    Variant SKU,specs.voltage,specs.weight_kg,specs.refrigerant,custom.part_type
-    ABC-001,220,12.5,R134a,Compressor
-    ABC-002,380,,R410a,
+    GID,specs.voltage,specs.weight_kg,specs.refrigerant,custom.part_type
+    gid://shopify/Product/123456789,220,12.5,R134a,Compressor
+    gid://shopify/Product/987654321,380,,R410a,
 
 Workflow:
     1. อ่าน CSV → แยก namespace/key จาก column header
     2. Query metafield definitions เพื่อดึง type (number_integer ฯลฯ)
-    3. Resolve SKU → product GID
+    3. ใช้ GID จาก CSV โดยตรง (ไม่ต้อง resolve SKU)
     4. Build JSONL → Staged upload → Bulk mutation → Poll
 
 Usage:
@@ -31,15 +31,14 @@ import time
 import pandas as pd
 import requests
 
-from utils import make_headers, gql, get_product_gids_by_skus, read_csv_auto, API_URL
+from utils import make_headers, gql, read_csv_auto, API_URL
 
 HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 
-base_dir       = os.path.dirname(__file__)
-DEFAULT_CSV    = os.path.join(base_dir, "data", "update_metafields_value.csv")
-JSONL_FILE     = os.path.join(base_dir, "output", "metafields_value_bulk.jsonl")
-GID_CACHE_FILE = os.path.join(base_dir, "cache", "product_gids.json")
-SKU_COL        = "Variant SKU"
+base_dir    = os.path.dirname(__file__)
+DEFAULT_CSV = os.path.join(base_dir, "data", "update_metafields_value_robot_coup.csv")
+JSONL_FILE  = os.path.join(base_dir, "output", "metafields_value_bulk.jsonl")
+GID_COL     = "GID"
 
 
 # ── Step 1: Fetch metafield definition types ──────────────────
@@ -66,17 +65,17 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> int:
     df = read_csv_auto(csv_file, dtype=str)
     print(f"Columns: {df.columns.tolist()}")
 
-    if SKU_COL not in df.columns:
-        print(f"❌ Column '{SKU_COL}' not found.")
+    if GID_COL not in df.columns:
+        print(f"❌ Column '{GID_COL}' not found.")
         return 0
 
     # Parse metafield columns (must be "namespace.key" format)
-    meta_cols = [c for c in df.columns if c != SKU_COL and "." in c]
+    meta_cols = [c for c in df.columns if c != GID_COL and "." in c]
     if not meta_cols:
         print("❌ No metafield columns found. Columns must be named 'namespace.key' (e.g. specs.voltage)")
         return 0
 
-    ignored = [c for c in df.columns if c != SKU_COL and "." not in c]
+    ignored = [c for c in df.columns if c != GID_COL and "." not in c]
     if ignored:
         print(f"⚠️  Ignored columns (no namespace.key format): {ignored}")
 
@@ -96,25 +95,15 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> int:
             print(f"  ⚠️  Definition not found for '{col}' — using single_line_text_field")
         col_info.append((col, ns, key, mf_type))
 
-    df = df.dropna(subset=[SKU_COL])
-    skus = df[SKU_COL].str.strip().tolist()
-    print(f"\n📋 {len(skus)} rows to process")
-
-    gid_map = get_product_gids_by_skus(API_URL, HEADERS, skus, cache_file=GID_CACHE_FILE)
-    not_found = [s for s, g in gid_map.items() if g is None]
-    if not_found:
-        print(f"⚠️  Not found ({len(not_found)}): {not_found[:10]}")
-        pd.DataFrame({"sku": not_found}).to_csv(
-            os.path.join(base_dir, "output", "not_found_metafields_value.csv"), index=False
-        )
+    df = df.dropna(subset=[GID_COL])
+    print(f"\n📋 {len(df)} rows to process")
 
     os.makedirs(os.path.dirname(jsonl_file), exist_ok=True)
     count = 0
 
     with open(jsonl_file, "w", encoding="utf-8") as f:
         for _, row in df.iterrows():
-            sku = str(row[SKU_COL]).strip()
-            gid = gid_map.get(sku)
+            gid = str(row[GID_COL]).strip()
             if not gid:
                 continue
 
@@ -123,10 +112,23 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> int:
                 val = row.get(col)
                 if pd.isna(val) or str(val).strip() == "":
                     continue
+                raw = str(val).strip()
+                # list.* types require a JSON array string e.g. ["val1","val2"]
+                if mf_type.startswith("list."):
+                    import ast
+                    try:
+                        parsed = ast.literal_eval(raw)
+                        if not isinstance(parsed, list):
+                            parsed = [raw]
+                    except Exception:
+                        parsed = [item.strip() for item in raw.split(",") if item.strip()]
+                    formatted = json.dumps(parsed, ensure_ascii=False)
+                else:
+                    formatted = raw
                 metafields.append({
                     "namespace": ns,
                     "key":       key,
-                    "value":     str(val).strip(),
+                    "value":     formatted,
                     "type":      mf_type,
                 })
 
@@ -223,11 +225,10 @@ if __name__ == "__main__":
     if not os.path.exists(csv_file):
         print(f"❌ CSV not found: {csv_file}")
         print(f"   Create it at: data/update_metafields_value.csv")
-        print(f"   Columns: Variant SKU, specs.voltage, specs.weight_kg, ...")
+        print(f"   Columns: GID, specs.voltage, specs.weight_kg, ...")
         sys.exit(1)
 
     os.makedirs(os.path.join(base_dir, "output"), exist_ok=True)
-    os.makedirs(os.path.join(base_dir, "cache"), exist_ok=True)
 
     count = build_jsonl(csv_file, JSONL_FILE)
     if count == 0:

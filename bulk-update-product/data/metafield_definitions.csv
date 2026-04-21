@@ -1,4 +1,8 @@
-name,namespace,key,type,description,filterable
-Power (W),specs,power_watt,number_integer,Power consumption in watts,true
-Weight (kg),specs,weight_kg,number_decimal,Product weight in kilograms,true
-Power Type,specs,power_type,single_line_text_field,Electric or Gas,true
+﻿name,namespace,key,type,description,filterable
+Compatible With,specs,compatible_with,list.single_line_text_field,,TRUE
+Cutting Size,specs,cutting_size,single_line_text_field,,TRUE
+Material,specs,material,single_line_text_field,,TRUE
+Installation,specs,installation,single_line_text_field,,TRUE
+Type of Cut,specs,type_of_cut,single_line_text_field,,TRUE
+Safety Features,specs,safety_features,single_line_text_field,,TRUE
+Made in,specs,made_in,single_line_text_field,,TRUE

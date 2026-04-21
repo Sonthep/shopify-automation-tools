@@ -15,7 +15,9 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-load_dotenv(override=True)
+# Explicit path to .env so it always loads the correct file
+_ENV_FILE = os.path.join(os.path.dirname(__file__), "..", ".env")
+load_dotenv(dotenv_path=_ENV_FILE, override=True)
 
 SHOP    = os.getenv("SHOP_NAME")
 API_VER = "2026-01"
