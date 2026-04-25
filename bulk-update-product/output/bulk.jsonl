@@ -1,0 +1,1 @@
+{"input": {"id": "gid://shopify/Product/8661114945735", "title": "Product Name 1", "descriptionHtml": "<p>Product description here.</p>", "vendor": "BrandName", "productType": "Kitchen Equipment", "metafields": [{"namespace": "custom", "key": "part_type", "value": "Kitchen Equipment", "type": "single_line_text_field"}], "tags": ["tag1", "tag2", "tag3"], "status": "ACTIVE"}}

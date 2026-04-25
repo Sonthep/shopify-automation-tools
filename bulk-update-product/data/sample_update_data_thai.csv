@@ -1,0 +1,4 @@
+Product GID,Variant SKU,title,Body (HTML),meta_title,meta_description
+gid://shopify/Product/123456789,SKU001,ชื่อสินค้า 1,"<p>รายละเอียดสินค้าภาษาไทย</p>",ชื่อ SEO ภาษาไทย,คำอธิบาย SEO ภาษาไทย
+gid://shopify/Product/123456790,SKU002,ชื่อสินค้า 2,"<p>รายละเอียดสินค้าที่ 2</p>",ชื่อ SEO สินค้า 2,คำอธิบาย SEO สินค้า 2
+gid://shopify/Product/123456791,,ชื่อสินค้า 3,,,

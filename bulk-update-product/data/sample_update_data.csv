@@ -1,0 +1,2 @@
+﻿Product GID,VariantGID,InventoryItemId,Title,Body (HTML),Vendor,Product Type,Tags,Status,Price,Compare At Price,Inventory quantity,Title TH,Body (HTML) TH,meta_title,meta_description
+gid://shopify/Product/8661114945735,gid://shopify/ProductVariant/46340215439559,gid://shopify/InventoryItem/48461149962439,Product Name 1,<p>Product description here.</p>,BrandName,Kitchen Equipment,"tag1,tag2,tag3",ACTIVE,1500,2000,10,ไทย,คำอธิบายไทย,ไทย,คำอธิบายไทย

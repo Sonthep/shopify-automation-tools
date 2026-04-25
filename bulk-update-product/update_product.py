@@ -8,7 +8,7 @@ import argparse
 import pandas as pd
 import requests
 
-from utils import make_headers, get_product_gids_by_skus, get_variant_gids_by_skus, get_val, gql, read_csv_auto, API_URL
+from utils import make_headers, get_val, gql, read_csv_auto, API_URL
 
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
@@ -17,6 +17,8 @@ LOCATION_ID = os.getenv("SHOPIFY_LOCATION_ID", "")
 
 # ── Column mapping (CSV header → Shopify field) ───────────────
 COL = {
+    "product_gid":      "Product GID",
+    "variant_gid":      "VariantGID",
     "sku":              "Variant SKU",
     "title":            "Title",
     "body_html":        "Body (HTML)",
@@ -25,41 +27,48 @@ COL = {
     "power_type":       "Power Type",
     "tags":             "Tags",
     "status":           "Status",
-    "price":            "Price",
-    "compare_at_price": "Compare At Price",
-    "inventory_qty":    "Inventory quantity",
+    "price":              "Price",
+    "compare_at_price":   "Compare At Price",
+    "inventory_qty":      "Inventory quantity",
+    "inventory_item_id":  "InventoryItemId",
+}
+
+# ── Thai translation ──────────────────────────────────────────
+LOCALE   = "th"
+COL_THAI = {
+    "title":            "Title TH",
+    "body_html":        "Body (HTML) TH",
+    "meta_title":       "meta_title",
+    "meta_description": "meta_description",
 }
 
 
 # ── Product update (Bulk API) ─────────────────────────────────
 
-def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, dict, list]:
+def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, list, list]:
+    """Read GIDs directly from CSV — no API lookups.
+    Returns (count, inv_entries, price_entries)
+      inv_entries   = [{inventoryItemId, locationId, quantity}]
+      price_entries = [{productId, variantId, price, compareAtPrice}]
+    """
     df = read_csv_auto(csv_file)
     print(f"Columns found: {df.columns.tolist()}")
 
-    sku_col = COL["sku"] if COL["sku"] in df.columns else "sku"
-    if sku_col not in df.columns:
-        print(f"Cannot find SKU column. Available: {df.columns.tolist()}")
-        return 0, {}
+    gid_col     = COL["product_gid"]      # "Product GID"
+    var_gid_col = COL["variant_gid"]      # "Variant GID"
+    inv_id_col  = COL["inventory_item_id"] # "Inventory Item ID"
 
-    skus = df[sku_col].dropna().tolist()
-    print(f"{len(skus)} SKUs found")
+    if gid_col not in df.columns:
+        print(f"[ERR] Column '{gid_col}' not found. Available: {df.columns.tolist()}")
+        return 0, [], []
 
-    gid_map         = get_product_gids_by_skus(API_URL, HEADERS, skus)
-    variant_gid_map = get_variant_gids_by_skus(API_URL, HEADERS, skus)
-    not_found = [s for s, g in gid_map.items() if g is None]
-    if not_found:
-        print(f"Not found: {not_found}")
-        pd.DataFrame({"sku": not_found}).to_csv(os.path.join(os.path.dirname(__file__), "output", "not_found.csv"), index=False)
-
-    sku_qty_map: dict[str, str] = {}
+    inv_entries:   list = []
     price_entries: list = []
     count = 0
 
     with open(jsonl_file, "w", encoding="utf-8") as f:
         for _, row in df.iterrows():
-            sku = row[sku_col]
-            gid = gid_map.get(sku)
+            gid = get_val(row, gid_col)
             if not gid:
                 continue
 
@@ -84,19 +93,26 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, dict, list]:
             if v := get_val(row, COL["status"]):
                 input_data["status"] = v.upper()
 
-            if v := get_val(row, COL["inventory_qty"]):
-                sku_qty_map[sku] = v
+            # ── Inventory (direct Inventory Item ID) ──
+            inv_id = get_val(row, inv_id_col) if inv_id_col in df.columns else None
+            qty    = get_val(row, COL["inventory_qty"])
+            if inv_id and qty:
+                inv_entries.append({
+                    "inventoryItemId": inv_id,
+                    "locationId":      LOCATION_ID,
+                    "quantity":        int(float(qty)),
+                })
 
+            # ── Price (direct Variant GID) ──
             price         = get_val(row, COL["price"])
             compare_price = get_val(row, COL["compare_at_price"])
             if price or compare_price:
-                # API 2024-07+: price must be updated via productVariantsBulkUpdate, NOT productUpdate
-                variant_gid = variant_gid_map.get(sku)
+                variant_gid = get_val(row, var_gid_col) if var_gid_col in df.columns else None
                 if variant_gid:
                     price_entries.append({
-                        "productId":    gid,
-                        "variantId":    variant_gid,
-                        "price":        price,
+                        "productId":      gid,
+                        "variantId":      variant_gid,
+                        "price":          price,
                         "compareAtPrice": compare_price,
                     })
 
@@ -106,8 +122,8 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, dict, list]:
             f.write(json.dumps({"input": input_data}) + "\n")
             count += 1
 
-    print(f"{count} product rows -> {jsonl_file} | {len(price_entries)} price entries collected")
-    return count, sku_qty_map, price_entries
+    print(f"{count} product rows -> {jsonl_file} | {len(inv_entries)} inv | {len(price_entries)} price")
+    return count, inv_entries, price_entries
 
 
 def create_staged_upload(filename: str = "bulk.jsonl") -> dict | None:
@@ -231,66 +247,194 @@ def poll_status(interval: int = 15) -> str | None:
         time.sleep(interval)
 
 
-# ── Inventory update (batch) ──────────────────────────────────
+# ── Thai translation functions ────────────────────────────────
+
+def get_digests_batch(product_gids: list, batch_size: int = 100) -> dict:
+    """Fetch translatableContent digests for many products in batched alias queries."""
+    all_digests: dict = {}
+    total = len(product_gids)
+    for i in range(0, total, batch_size):
+        batch = product_gids[i:i + batch_size]
+        aliases = "\n".join([
+            f'r{j}: translatableResource(resourceId: "{gid}") '
+            f'{{ translatableContent {{ key digest }} }}'
+            for j, gid in enumerate(batch)
+        ])
+        result = gql(API_URL, HEADERS, f"{{ {aliases} }}")
+        if result is None or result.get("errors"):
+            print(f"  [ERR] Digest batch error: {(result or {}).get('errors')}")
+            for gid in batch:
+                all_digests[gid] = {}
+            continue
+        data = result.get("data", {})
+        for j, gid in enumerate(batch):
+            resource = data.get(f"r{j}")
+            all_digests[gid] = (
+                {item["key"]: item["digest"] for item in resource["translatableContent"]}
+                if resource else {}
+            )
+        print(f"  Fetched digests {min(i + batch_size, total)}/{total}")
+        time.sleep(0.3)
+    return all_digests
+
+
+def build_translation_jsonl(csv_file: str, jsonl_file: str, locale: str = LOCALE) -> int:
+    """Build JSONL for Thai (or any locale) translations using translationsRegister."""
+    df = read_csv_auto(csv_file)
+    print(f"Columns found: {df.columns.tolist()}")
+
+    gid_col = COL["product_gid"]  # "Product GID"
+    sku_col = COL["sku"] if COL["sku"] in df.columns else "sku"
+
+    has_gid_col = gid_col in df.columns
+    has_sku_col = sku_col in df.columns
+
+    if not has_gid_col and not has_sku_col:
+        print(f"[ERR] Cannot find 'Product GID' or SKU column. Available: {df.columns.tolist()}")
+        return 0
+
+    gid_map: dict = {}
+    if has_sku_col and not has_gid_col:
+        skus = df[sku_col].dropna().unique().tolist()
+        print(f"{len(skus)} unique SKUs found")
+        gid_map   = get_product_gids_by_skus(API_URL, HEADERS, skus)
+        not_found = [s for s, g in gid_map.items() if g is None]
+        if not_found:
+            print(f"  Warning: not found: {not_found}")
+
+    # Collect all GIDs to fetch digests
+    all_gids: list = []
+    for _, row in df.iterrows():
+        gid = get_val(row, gid_col) if has_gid_col else gid_map.get(get_val(row, sku_col))
+        if gid:
+            all_gids.append(gid)
+    valid_gids = list(dict.fromkeys(all_gids))  # deduplicate, preserve order
+    print(f"Fetching digests for {len(valid_gids)} products...")
+    digest_map = get_digests_batch(valid_gids)
+
+    rows_written = 0
+    with open(jsonl_file, "w", encoding="utf-8") as f:
+        for _, row in df.iterrows():
+            if has_gid_col:
+                product_gid = get_val(row, gid_col)
+            else:
+                product_gid = gid_map.get(get_val(row, sku_col))
+            if not product_gid:
+                continue
+            digests = digest_map.get(product_gid, {})
+            if not digests:
+                print(f"  Warning: no digests for SKU {sku}")
+                continue
+            for field, csv_col in COL_THAI.items():
+                if csv_col not in df.columns or field not in digests:
+                    continue
+                raw = row.get(csv_col)
+                if pd.isna(raw):
+                    continue
+                value = str(raw).strip()
+                if not value:
+                    continue
+                f.write(json.dumps({
+                    "resourceId": product_gid,
+                    "input": {
+                        "key":                        field,
+                        "value":                      value,
+                        "locale":                     locale,
+                        "translatableContentDigest":  digests[field],
+                    },
+                }, ensure_ascii=False) + "\n")
+                rows_written += 1
+
+    print(f"{rows_written} translation entries -> {jsonl_file}")
+    return rows_written
+
+
+def create_staged_upload_translation(filename: str = "translation_bulk.jsonl") -> dict | None:
+    """Staged upload using POST (multipart) — required for translation bulk ops."""
+    query = f"""
+    mutation {{
+      stagedUploadsCreate(input: {{
+        resource: BULK_MUTATION_VARIABLES,
+        filename: "{filename}",
+        mimeType: "text/jsonl",
+        httpMethod: POST
+      }}) {{
+        stagedTargets {{ url resourceUrl parameters {{ name value }} }}
+        userErrors {{ field message }}
+      }}
+    }}"""
+    body = gql(API_URL, HEADERS, query)
+    if not body:
+        return None
+    data = body["data"]["stagedUploadsCreate"]
+    if data.get("userErrors"):
+        print(f"stagedUploadsCreate error: {data['userErrors']}")
+        return None
+    target = data["stagedTargets"][0]
+    print(f"Staged upload (POST) created: {target['resourceUrl']}")
+    return target
+
+
+def upload_jsonl_post(target: dict, filepath: str) -> str:
+    """Upload JSONL via multipart POST (for translation bulk ops)."""
+    params = {p["name"]: p["value"] for p in target["parameters"]}
+    with open(filepath, "rb") as f:
+        res = requests.post(target["url"], data=params, files={"file": f})
+    res.raise_for_status()
+    staged_path = params.get("key", target["resourceUrl"])
+    print(f"Uploaded (POST): {filepath}")
+    return staged_path
+
+
+def run_translation_bulk_mutation(resource_url: str) -> dict | None:
+    mutation = """
+    mutation RunBulkTranslation($stagedUploadPath: String!) {
+      bulkOperationRunMutation(
+        mutation: \"\"\"
+          mutation RegisterTranslation($input: TranslationInput!, $resourceId: ID!) {
+            translationsRegister(resourceId: $resourceId, translations: [$input]) {
+              translations { key locale }
+              userErrors { field message }
+            }
+          }
+        \"\"\",
+        stagedUploadPath: $stagedUploadPath
+      ) {
+        bulkOperation { id status }
+        userErrors { field message }
+      }
+    }"""
+    body = gql(API_URL, HEADERS, mutation, {"stagedUploadPath": resource_url})
+    if not body:
+        return None
+    op = body["data"]["bulkOperationRunMutation"]
+    if op["userErrors"]:
+        print(f"Translation bulk mutation error: {op['userErrors']}")
+        return None
+    print(f"Translation bulk operation started: {op['bulkOperation']['id']}")
+    return op
+
+
+# ── Inventory update ─────────────────────────────────────────
 
 def read_inventory_csv(filepath: str) -> list[dict]:
+    """Read inventory CSV with columns: Inventory Item ID, Inventory quantity."""
     rows = []
     with open(filepath, newline="", encoding="utf-8-sig") as f:
         for row in csv.DictReader(f):
-            rows.append({"sku": row["sku"].strip(), "quantity": int(row["quantity"].strip())})
-    print(f"Loaded {len(rows)} rows from {filepath}")
+            inv_id = (row.get(COL["inventory_item_id"]) or row.get("Inventory Item ID") or "").strip()
+            qty    = (row.get(COL["inventory_qty"])     or row.get("Inventory quantity") or "").strip()
+            if inv_id and qty:
+                rows.append({
+                    "inventoryItemId": inv_id,
+                    "locationId":      LOCATION_ID,
+                    "quantity":        int(float(qty)),
+                })
+    print(f"Loaded {len(rows)} inventory rows from {filepath}")
     return rows
 
 
-INVENTORY_CACHE_FILE = os.path.join(os.path.dirname(__file__), "cache", "inventory_item_ids.json")
-
-
-def get_inventory_item_ids_batch(skus: list, batch_size: int = 50) -> dict:
-    """Resolve SKUs -> inventoryItemId using alias batching.
-    Loads from cache file if available; saves to cache after fetching from API.
-    Returns {sku: inventoryItemId or None}
-    """
-    # Load cache
-    cache: dict = {}
-    if os.path.exists(INVENTORY_CACHE_FILE):
-        with open(INVENTORY_CACHE_FILE, encoding="utf-8") as f:
-            cache = json.load(f)
-
-    missing = [sku for sku in skus if sku not in cache]
-    if not missing:
-        print(f"  All {len(skus)} SKUs loaded from cache ({INVENTORY_CACHE_FILE})")
-        return {sku: cache.get(sku) for sku in skus}
-
-    if len(missing) < len(skus):
-        print(f"  Cache hit: {len(skus) - len(missing)} SKUs | Fetching: {len(missing)} SKUs")
-    else:
-        print(f"  No cache found — fetching {len(missing)} SKUs from API...")
-
-    total = len(missing)
-    for i in range(0, total, batch_size):
-        batch = missing[i:i + batch_size]
-        aliases = "\n".join([
-            f'p{j}: productVariants(first: 1, query: "sku:{sku}") '
-            f'{{ edges {{ node {{ sku inventoryItem {{ id }} }} }} }}'
-            for j, sku in enumerate(batch)
-        ])
-        body = gql(API_URL, HEADERS, f"{{ {aliases} }}")
-        data = (body or {}).get("data", {})
-        for j, sku in enumerate(batch):
-            edges = data.get(f"p{j}", {}).get("edges", [])
-            cache[sku] = edges[0]["node"]["inventoryItem"]["id"] if edges else None
-        print(f"  Resolved: {min(i + batch_size, total)}/{total}")
-        time.sleep(0.5)
-
-    # Save updated cache
-    with open(INVENTORY_CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(cache, f, ensure_ascii=False, indent=2)
-    print(f"  Cache saved: {INVENTORY_CACHE_FILE}")
-
-    return {sku: cache.get(sku) for sku in skus}
-
-
-def build_inventory_jsonl(quantities: list, jsonl_file: str, batch_size: int = 250) -> int:
+def build_inventory_jsonl(quantities: list, jsonl_file: str, batch_size: int = 2500) -> int:
     """Write JSONL for bulk inventory update.
     Each line = one inventorySetQuantities call with up to batch_size items.
     Returns number of lines written.
@@ -340,99 +484,58 @@ def run_inventory_bulk_mutation(resource_url: str) -> dict | None:
     return op
 
 
-def update_inventory(rows: list[dict]):
-    """Resolve SKU -> inventoryItemId, build JSONL, then run async bulk mutation."""
-    skus = [r["sku"] for r in rows]
-    qty_map = {r["sku"]: r["quantity"] for r in rows}
-
-    print(f"Resolving inventoryItemId for {len(skus)} SKUs...")
-    inv_map = get_inventory_item_ids_batch(skus)
-
-    not_found = [sku for sku, iid in inv_map.items() if iid is None]
-    if not_found:
-        print(f"  Warning: {len(not_found)} SKU(s) not found: {not_found[:10]}")
-
-    # Deduplicate by inventoryItemId — keep last quantity if same item appears multiple times
-    seen: dict = {}  # inventoryItemId -> quantity
-    for sku, iid in inv_map.items():
-        if iid is None:
-            continue
-        seen[iid] = qty_map[sku]  # last SKU wins if duplicate inventoryItemId
-
-    dup_count = len([iid for sku, iid in inv_map.items() if iid is not None]) - len(seen)
-    if dup_count:
-        print(f"  Warning: {dup_count} duplicate inventoryItemId(s) removed (same variant, multiple SKUs)")
-
-    quantities = [
-        {"inventoryItemId": iid, "locationId": LOCATION_ID, "quantity": qty}
-        for iid, qty in seen.items()
-    ]
-
+def run_inventory(quantities: list[dict]):
+    """Build JSONL from pre-resolved quantities and run bulk mutation.
+    quantities = [{inventoryItemId, locationId, quantity}, ...]
+    """
     if not quantities:
         print("No inventory items to update.")
         return
-
+    # Deduplicate — keep last entry if same inventoryItemId appears twice
+    seen: dict = {q["inventoryItemId"]: q for q in quantities}
+    quantities = list(seen.values())
     print(f"Building inventory JSONL for {len(quantities)} items...")
     jsonl_file = os.path.join(os.path.dirname(__file__), "output", "inventory_bulk.jsonl")
     build_inventory_jsonl(quantities, jsonl_file)
-
     target = create_staged_upload("inventory_bulk.jsonl")
     if not target:
         print("  Failed to create staged upload for inventory.")
         return
-
     resource_url = upload_jsonl(target, jsonl_file)
     op = run_inventory_bulk_mutation(resource_url)
     if not op:
         print("  Inventory bulk mutation did not start.")
         return
-
     print("Polling inventory bulk operation...")
     result_url = poll_status()
-
     print(f"\n{'='*40}")
     print(f"Inventory bulk done. Result URL: {result_url}")
-    if not_found:
-        print(f"SKU not found ({len(not_found)}): {not_found[:10]}")
-
-
-def update_inventory_from_csv(filepath: str):
-    update_inventory(read_inventory_csv(filepath))
-
-
-def update_inventory_from_map(sku_qty_map: dict):
-    rows = [{"sku": sku, "quantity": int(float(qty))} for sku, qty in sku_qty_map.items()]
-    update_inventory(rows)
 
 
 # ── Main ─────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Shopify product & inventory updater")
-    parser.add_argument("--csv",           default="data/update_qty.csv", help="Main product CSV")
-    parser.add_argument("--inv-csv",       default="",                    help="Inventory-only CSV (columns: sku, quantity)")
-    parser.add_argument("--inv-only",      action="store_true",           help="Skip product update, run inventory only")
-    parser.add_argument("--rebuild-cache", action="store_true",           help="Delete inventory cache and re-fetch from API")
+    parser.add_argument("--csv",      default="data/sample_update_data.csv", help="Main CSV (must contain Product GID column)")
+    parser.add_argument("--inv-csv",  default="",                    help="Inventory-only CSV (columns: Inventory Item ID, Inventory quantity)")
+    parser.add_argument("--inv-only", action="store_true",           help="Skip product update, run inventory only")
+    parser.add_argument("--thai",     action="store_true",           help="Run Thai translation update (auto-detected if Thai columns exist)")
+    parser.add_argument("--no-thai",  action="store_true",           help="Skip Thai translation even if Thai columns exist")
+    parser.add_argument("--thai-csv", default="",                    help="Thai CSV (default: same as --csv)")
     args = parser.parse_args()
 
     base_dir   = os.path.dirname(__file__)
-
-    if args.rebuild_cache and os.path.exists(INVENTORY_CACHE_FILE):
-        os.remove(INVENTORY_CACHE_FILE)
-        print(f"Cache deleted: {INVENTORY_CACHE_FILE}")
-
-    CSV_FILE   = os.path.join(base_dir, "data/update_price.csv")
-    os.makedirs(os.path.join(base_dir, "output"), exist_ok=True)
-    os.makedirs(os.path.join(base_dir, "cache"), exist_ok=True)
+    CSV_FILE   = args.csv if os.path.isabs(args.csv) else os.path.join(base_dir, args.csv)
     JSONL_FILE = os.path.join(base_dir, "output", "bulk.jsonl")
+    os.makedirs(os.path.join(base_dir, "output"), exist_ok=True)
 
-    sku_qty_map: dict  = {}
+    inv_entries:   list = []
     price_entries: list = []
 
     # ── 1. Product fields update ──
     if not args.inv_only:
         print(f"Using CSV: {CSV_FILE}")
-        count, sku_qty_map, price_entries = build_jsonl(CSV_FILE, JSONL_FILE)
+        count, inv_entries, price_entries = build_jsonl(CSV_FILE, JSONL_FILE)
 
         if count > 0:
             target = create_staged_upload()
@@ -448,7 +551,7 @@ if __name__ == "__main__":
         else:
             print("No product fields to update — skipping bulk upload.")
 
-        # ── 1b. Price / compareAtPrice update (requires separate bulk op) ──
+        # ── 1b. Price / compareAtPrice update ──
         if price_entries:
             print(f"\nPrice update for {len(price_entries)} variant(s)...")
             price_jsonl = os.path.join(base_dir, "output", "price_bulk.jsonl")
@@ -466,17 +569,42 @@ if __name__ == "__main__":
                     print("  Price bulk mutation did not start.")
 
     # ── 2. Inventory update ──
-    inv_csv_path = (
-        os.path.join(base_dir, args.inv_csv) if args.inv_csv else
-        os.path.join(base_dir, "data/inventory.csv") if os.path.exists(os.path.join(base_dir, "data/inventory.csv")) else
-        None
-    )
-
-    if inv_csv_path:
+    if args.inv_csv:
+        inv_csv_path = os.path.join(base_dir, args.inv_csv)
         print(f"\nInventory update from: {inv_csv_path}")
-        update_inventory_from_csv(inv_csv_path)
-    elif sku_qty_map:
-        print(f"\nInventory update for {len(sku_qty_map)} SKUs from main CSV...")
-        update_inventory_from_map(sku_qty_map)
+        run_inventory(read_inventory_csv(inv_csv_path))
+    elif inv_entries:
+        print(f"\nInventory update for {len(inv_entries)} item(s) from main CSV...")
+        run_inventory(inv_entries)
+
+    # ── 3. Thai translation (digest fetch required by Shopify) ──
+    # Auto-detect Thai columns if --thai not passed
+    if not args.thai and not args.no_thai:
+        try:
+            _df_check = read_csv_auto(CSV_FILE)
+            _thai_cols = [COL_THAI[k] for k in COL_THAI]
+            args.thai = any(c in _df_check.columns for c in _thai_cols)
+            if args.thai:
+                print("\nThai columns detected — running translation automatically.")
+        except Exception:
+            pass
+    if args.thai and not args.no_thai:
+        _thai_csv_rel = args.thai_csv if args.thai_csv else args.csv
+        thai_csv      = os.path.join(base_dir, _thai_csv_rel)
+        thai_jsonl    = os.path.join(base_dir, "output", "translation_bulk.jsonl")
+        print(f"\nThai translation from: {thai_csv}")
+        count_thai = build_translation_jsonl(thai_csv, thai_jsonl)
+        if count_thai > 0:
+            target = create_staged_upload_translation()
+            if target:
+                resource_url = upload_jsonl_post(target, thai_jsonl)
+                op = run_translation_bulk_mutation(resource_url)
+                if op:
+                    result_url = poll_status()
+                    print(f"Translation bulk done. Result URL: {result_url}")
+                else:
+                    print("  Translation bulk mutation did not start.")
+        else:
+            print("No translation entries to process.")
 
     print("\nAll done!")
