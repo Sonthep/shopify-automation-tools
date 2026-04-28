@@ -37,7 +37,7 @@ from utils import make_headers, gql, read_csv_auto, API_URL
 HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 
 base_dir    = os.path.dirname(__file__)
-DEFAULT_CSV = os.path.join(base_dir, "data", "update_metafields_value_berjaya.csv")
+DEFAULT_CSV = os.path.join(base_dir, "data", "update_metafieds_value_colged.csv")
 JSONL_FILE  = os.path.join(base_dir, "output", "metafields_value_bulk.jsonl")
 GID_COL     = "GID"
 DESC_COL    = "descriptionHtml"
@@ -63,6 +63,33 @@ def fetch_definition_types() -> dict:
 
 
 # ── Step 2: Build JSONL ───────────────────────────────────────
+def _coerce_value(raw: str, mf_type: str, col: str) -> str | None:
+    """แปลงค่าให้ตรง type — คืน None ถ้าแปลงไม่ได้ (จะ skip field นั้น)"""
+    if mf_type == "number_integer":
+        cleaned = raw.replace(",", "").replace(" ", "").strip()
+        try:
+            return str(int(float(cleaned)))
+        except ValueError:
+            print(f"  ⚠️  Skip '{col}': '{raw}' ไม่ใช่ integer")
+            return None
+    if mf_type == "number_decimal":
+        cleaned = raw.replace(",", "").strip()
+        try:
+            return str(float(cleaned))
+        except ValueError:
+            print(f"  ⚠️  Skip '{col}': '{raw}' ไม่ใช่ decimal")
+            return None
+    if mf_type == "boolean":
+        v = raw.strip().lower()
+        if v in ("yes", "true", "1"):
+            return "true"
+        if v in ("no", "false", "0", "-", "none", ""):
+            return "false"
+        print(f"  ⚠️  Skip '{col}': '{raw}' ไม่ใช่ boolean (ใช้ Yes/No)")
+        return None
+    return raw
+
+
 def build_jsonl(csv_file: str, jsonl_file: str) -> int:
     df = read_csv_auto(csv_file, dtype=str)
     print(f"Columns: {df.columns.tolist()}")
@@ -131,7 +158,9 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> int:
                         parsed = [item.strip() for item in raw.split(",") if item.strip()]
                     formatted = json.dumps(parsed, ensure_ascii=False)
                 else:
-                    formatted = raw
+                    formatted = _coerce_value(raw, mf_type, col)
+                    if formatted is None:
+                        continue
                 metafields.append({
                     "namespace": ns,
                     "key":       key,
@@ -220,7 +249,7 @@ def run_bulk_mutation(resource_url: str) -> bool:
 
 
 def poll_status(interval: int = 15) -> bool:
-    query = "{ currentBulkOperation(type: MUTATION) { id status errorCode objectCount } }"
+    query = "{ currentBulkOperation(type: MUTATION) { id status errorCode objectCount url } }"
     while True:
         body = gql(API_URL, HEADERS, query)
         op   = (body or {}).get("data", {}).get("currentBulkOperation")
@@ -230,11 +259,46 @@ def poll_status(interval: int = 15) -> bool:
         print(f"  [{op['status']}] {op['objectCount']} rows")
         if op["status"] == "COMPLETED":
             print(f"✅ Done! {op['objectCount']} products updated")
+            result_url = op.get("url")
+            if result_url:
+                _print_bulk_errors(result_url)
             return True
         if op["status"] in ("FAILED", "CANCELED"):
             print(f"❌ {op['errorCode']}")
             return False
         time.sleep(interval)
+
+
+def _print_bulk_errors(result_url: str) -> None:
+    """Download bulk result JSONL and print any userErrors."""
+    try:
+        resp = requests.get(result_url, timeout=30)
+        resp.raise_for_status()
+    except Exception as e:
+        print(f"⚠️  Could not fetch bulk result: {e}")
+        return
+
+    errors_found = 0
+    for line in resp.text.splitlines():
+        if not line.strip():
+            continue
+        try:
+            obj = json.loads(line)
+        except Exception:
+            continue
+        # Shopify bulk result wraps under obj["data"]["productUpdate"]
+        update = (obj.get("data") or obj).get("productUpdate", {})
+        user_errors = update.get("userErrors", [])
+        if user_errors:
+            prod_id = (update.get("product") or {}).get("id", "unknown")
+            for err in user_errors:
+                print(f"  ⚠️  [{prod_id}] field={err.get('field')} → {err.get('message')}")
+                errors_found += 1
+
+    if errors_found == 0:
+        print("  No userErrors in bulk result.")
+    else:
+        print(f"  Total userErrors: {errors_found}")
 
 
 # ── Main ─────────────────────────────────────────────────────

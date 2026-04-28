@@ -1,59 +1,102 @@
-﻿name,key
-Compatible With,custom.compatible_with
-FLIPHTML5,custom.fliphtml5
-Good ID,custom.good_id
-LInk pdf,custom.link_pdf
-Product Type,custom.part_type
-Power Type,custom.power_type
-Spec Sheet,custom.spec_sheet
-Bought together products,globo--filter--product_recommendation.bought_together_products
-Complementary products,globo--filter--product_recommendation.complementary_products
-Related products,globo--filter--product_recommendation.related_products
-Complementary products,shopify--discovery--product_recommendation.complementary_products
-Related products,shopify--discovery--product_recommendation.related_products
-Related products settings,shopify--discovery--product_recommendation.related_products_display
-Search product boosts,shopify--discovery--product_search_boost.queries
-Age group,shopify.age-group
-Color,shopify.color-pattern
-Material,shopify.material
-Target gender,shopify.target-gender
-Accessories,specs.accessories
-Ampere,specs.ampere
-Certificates,specs.certificates
-Chiller capacity volume (liter),specs.chiller_capacity_liter
-Chiller door amount,specs.chiller_door_amount
-Chiller temperature,specs.chiller_temperature
-Compressor Warranty,specs.compressor_warranty
-Construction,specs.construction
-Cooking Surface (mm),specs.cooking_surface_mm
-Cutting Size,specs.cutting_size
-Depth (mm),specs.depth_mm
-Drawer Amount,specs.drawer_amount
-Energy Type,specs.energy_type
-Freezer Capacity Volume,specs.freezer_capacity_volume
-Freezer Door Amount,specs.freezer_door_amount
-Freezer Temperature,specs.freezer_temperature
-Height (mm),specs.height_mm
-Hz,specs.hz
-Installation,specs.installation
-Length (mm),specs.length_mm
-Made in,specs.made_in
-Material,specs.material
-Packing Height (mm),specs.packing_height_mm
-Packing Length (mm),specs.packing_length_mm
-Packing Weight (kg),specs.packing_weight_kg
-Packing Width,specs.packing_width
-Performance Rate,specs.performance_rate
-Product of,specs.product_of
-Refrigerant,specs.refrigerant
-Safety Features,specs.safety_features
-Service warranty,specs.service_warranty
-Spareparts warranty,specs.spareparts_warranty
-Special Features,specs.special_features
-Temperature,specs.temperature
-Type of Cut,specs.type_of_cut
-Usage Time,specs.usage_time
-Voltage,specs.voltage
-Wattage,specs.wattage
-Weight (kg),specs.weight_kg
-Width (mm),specs.width_mm
+﻿name,key,type
+Compatible With,custom.compatible_with,list.single_line_text_field
+FLIPHTML5,custom.fliphtml5,url
+Good ID,custom.good_id,single_line_text_field
+LInk pdf,custom.link_pdf,url
+Product Type,custom.part_type,single_line_text_field
+Power Type,custom.power_type,single_line_text_field
+Spec Sheet,custom.spec_sheet,file_reference
+Bought together products,globo--filter--product_recommendation.bought_together_products,list.product_reference
+Complementary products,globo--filter--product_recommendation.complementary_products,list.product_reference
+Related products,globo--filter--product_recommendation.related_products,list.product_reference
+Complementary products,shopify--discovery--product_recommendation.complementary_products,list.product_reference
+Related products,shopify--discovery--product_recommendation.related_products,list.product_reference
+Related products settings,shopify--discovery--product_recommendation.related_products_display,single_line_text_field
+Search product boosts,shopify--discovery--product_search_boost.queries,list.single_line_text_field
+Age group,shopify.age-group,list.metaobject_reference
+Color,shopify.color-pattern,list.metaobject_reference
+Material,shopify.material,list.metaobject_reference
+Target gender,shopify.target-gender,list.metaobject_reference
+Accessories,specs.accessories,single_line_text_field
+Ampere,specs.ampere,number_decimal
+Boiler Heating Element (W),specs.boiler_heating_element_w,number_integer
+Boiler Type,specs.boiler_type,single_line_text_field
+Boiler Volume (L),specs.boiler_volume_l,number_decimal
+Certificates,specs.certificates,single_line_text_field
+Chiller capacity volume (liter),specs.chiller_capacity_liter,number_decimal
+Chiller door amount,specs.chiller_door_amount,number_integer
+Chiller temperature,specs.chiller_temperature,single_line_text_field
+Compressor Warranty,specs.compressor_warranty,single_line_text_field
+Construction,specs.construction,single_line_text_field
+Cooking Surface (mm),specs.cooking_surface_mm,single_line_text_field
+Cutting Size,specs.cutting_size,single_line_text_field
+Depth (mm),specs.depth_mm,number_integer
+Detergent Dispenser,specs.detergent_dispenser,boolean
+Door Construction,specs.door_construction,single_line_text_field
+Door/Hood Opening (cm),specs.door_opening_cm,number_decimal
+Drain Pump (W),specs.drain_pump_power_w,number_integer
+Drawer Amount,specs.drawer_amount,single_line_text_field
+Energy Type,specs.energy_type,single_line_text_field
+Freezer Capacity Volume,specs.freezer_capacity_volume,single_line_text_field
+Freezer Door Amount,specs.freezer_door_amount,single_line_text_field
+Freezer Temperature,specs.freezer_temperature,single_line_text_field
+Gross Weight (kg),specs.gross_weight_kg,number_decimal
+Height (mm),specs.height_mm,number_integer
+Hz,specs.hz,number_integer
+Installation,specs.installation,single_line_text_field
+Length (mm),specs.length_mm,single_line_text_field
+Made in,specs.made_in,single_line_text_field
+Material,specs.material,single_line_text_field
+Maximum Dishes Height (mm),specs.max_dishes_height_mm,number_integer
+Max Electric Power (W),specs.max_electric_power_w,number_integer
+Maximum Glass Height (mm),specs.max_glass_height_mm,number_integer
+Maximum Real Productivity (racks/hour),specs.max_real_productivity_rph,number_integer
+Maximum Theoretical Productivity (racks/hour),specs.max_theoretical_productivity_rph,number_integer
+Maximum Trays Height (mm),specs.max_trays_height_mm,number_integer
+Maximum Water Consumption (Liters/hour),specs.max_water_consumption_lph,number_decimal
+Maximum Water Consumption (Liters/rack),specs.max_water_consumption_lpr,number_decimal
+Max Water Supply Pressure (bar),specs.max_water_pressure_bar,number_decimal
+Max Water Supply Temperature (°C),specs.max_water_temp_c,number_decimal
+Min Water Supply Pressure (bar),specs.min_water_pressure_bar,number_decimal
+Min Water Supply Temperature (°C),specs.min_water_temp_c,number_decimal
+Net Weight (kg),specs.net_weight_kg,number_decimal
+Packing Height (mm),specs.packing_height_mm,single_line_text_field
+Packing Length (mm),specs.packing_length_mm,single_line_text_field
+Packing Weight (kg),specs.packing_weight_kg,single_line_text_field
+Packing Width,specs.packing_width,single_line_text_field
+Performance Rate,specs.performance_rate,single_line_text_field
+Phrase,specs.phrase,single_line_text_field
+Power with cold water supply (W),specs.power_cold_water_w,number_integer
+Power with plus heat recovery system (W),specs.power_heat_recovery_w,number_integer
+Power with hot water supply (W),specs.power_hot_water_w,number_integer
+Product of,specs.product_of,single_line_text_field
+Productivity Speed 1 (racks/hr),specs.productivity_speed_1_rph,number_integer
+Productivity Speed 2 (racks/hr),specs.productivity_speed_2_rph,number_integer
+Pump Warranty,specs.pump_warranty,single_line_text_field
+Rack Size (mm),specs.rack_size_mm,single_line_text_field
+Refrigerant,specs.refrigerant,single_line_text_field
+Rinse Aid Dispenser,specs.rinse_aid_dispenser,boolean
+Rinse Pump (W),specs.rinse_pump_power_w,number_integer
+Rinse Temperature (°C),specs.rinse_temperature_c,number_decimal
+Rinse Water Consumption,specs.rinse_water_consumption,single_line_text_field
+Safety Features,specs.safety_features,single_line_text_field
+Self Cleaning Cycle,specs.self_cleaning_cycle,boolean
+Service warranty,specs.service_warranty,single_line_text_field
+Spareparts warranty,specs.spareparts_warranty,single_line_text_field
+Special Features,specs.special_features,single_line_text_field
+Tank Heating Element (W),specs.tank_heating_element_w,number_integer
+Tank Surface Strainers,specs.tank_surface_strainers,single_line_text_field
+Tank Volume (L),specs.tank_volume_l,number_decimal
+Temperature,specs.temperature,single_line_text_field
+Type of Cut,specs.type_of_cut,single_line_text_field
+Useable Chamber Height (mm),specs.usable_chamber_height_mm,number_integer
+Usage Time,specs.usage_time,single_line_text_field
+Voltage,specs.voltage,single_line_text_field
+Volume (mc),specs.volume_mc,number_decimal
+Wash Cycle (sec),specs.wash_cycle_sec,number_integer
+Wash Pump Power (W),specs.wash_pump_power_w,number_integer
+Wash Pump Type,specs.wash_pump_type,single_line_text_field
+Wash Temperature (°C),specs.wash_temperature_c,number_decimal
+Wattage,specs.wattage,single_line_text_field
+Weight (kg),specs.weight_kg,single_line_text_field
+Width (mm),specs.width_mm,number_integer

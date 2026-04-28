@@ -26,6 +26,7 @@ query getMetafieldDefs($cursor: String) {
         name
         namespace
         key
+        type { name }
       }
     }
   }
@@ -49,6 +50,7 @@ def fetch_definitions() -> list[dict]:
             rows.append({
                 "name": node["name"],
                 "key":  f"{node['namespace']}.{node['key']}",
+                "type": node["type"]["name"],
             })
         if not page_info["hasNextPage"]:
             break

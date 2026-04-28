@@ -23,7 +23,7 @@ from utils import make_headers, gql, API_URL
 HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 
 base_dir     = os.path.dirname(__file__)
-DEFAULT_CSV  = os.path.join(base_dir, "data", "metafield_definitions_berjaya.csv")
+DEFAULT_CSV  = os.path.join(base_dir, "data", "metafield_definitions_colged.csv")
 OUTPUT_DIR   = os.path.join(base_dir, "output")
 
 VALID_TYPES = {
