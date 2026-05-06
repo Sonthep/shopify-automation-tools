@@ -53,8 +53,8 @@ def fetch_pdf_files() -> list[dict]:
             # Skip nodes that don't match GenericFile (empty dict from other types)
             if not node:
                 continue
-            mime = node.get("mimeType", "")
-            url  = node.get("url", "")
+            mime = node.get("mimeType") or ""
+            url  = node.get("url") or ""
             if mime != "application/pdf" and not url.lower().endswith(".pdf"):
                 continue
             # Extract file name from URL

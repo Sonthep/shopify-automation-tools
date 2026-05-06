@@ -37,7 +37,7 @@ from utils import make_headers, gql, read_csv_auto, API_URL
 HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 
 base_dir    = os.path.dirname(__file__)
-DEFAULT_CSV = os.path.join(base_dir, "data", "update_metafieds_value_colged.csv")
+DEFAULT_CSV = os.path.join(base_dir, "data", "update_pdf.csv")
 JSONL_FILE  = os.path.join(base_dir, "output", "metafields_value_bulk.jsonl")
 GID_COL     = "GID"
 DESC_COL    = "descriptionHtml"

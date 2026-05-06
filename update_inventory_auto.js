@@ -430,6 +430,7 @@ function refreshGoodIdCache() {
       "    pageInfo { hasNextPage endCursor }",
       "    edges {",
       "      node {",
+      "        id",
       '        metafield(namespace: "custom", key: "good_id") { value }',
       "        variants(first: 100) {",
       "          edges {",
@@ -450,10 +451,11 @@ function refreshGoodIdCache() {
 
     const products = res.data.products;
     products.edges.forEach(function(e) {
-      const node     = e.node;
-      const mf       = node.metafield;
-      const goodId   = mf ? String(mf.value || "").trim() : "";
-      const varEdges = node.variants && node.variants.edges;
+      const node      = e.node;
+      const productId = node.id || "";
+      const mf        = node.metafield;
+      const goodId    = mf ? String(mf.value || "").trim() : "";
+      const varEdges  = node.variants && node.variants.edges;
       if (!varEdges || varEdges.length === 0) return;
 
       varEdges.forEach(function(ve) {
@@ -467,7 +469,7 @@ function refreshGoodIdCache() {
         if (goodId) goodIdMap[goodId] = invItemId;
 
         // เก็บทุก variant — GoodID เป็น col A (blank ถ้าไม่มี)
-        cacheRows.push([goodId, sku, invItemId]);
+        cacheRows.push([goodId, sku, invItemId, productId]);
       });
       productCount++;
     });
@@ -526,12 +528,12 @@ function refreshGoodIdCache() {
     cacheSheet.clearContents();
   }
 
-  cacheSheet.appendRow(["GoodID", "SKU", "InventoryItemId", "CachedAt"]);
+  cacheSheet.appendRow(["GoodID", "SKU", "InventoryItemId", "ProductGID", "CachedAt"]);
   const tz  = Session.getScriptTimeZone() || "Asia/Bangkok";
   const now = Utilities.formatDate(new Date(), tz, "dd/MM/yyyy HH:mm");
   if (cacheRows.length > 0) {
-    const rowsWithTime = cacheRows.map(function(r) { return [r[0], r[1], r[2], now]; });
-    cacheSheet.getRange(2, 1, rowsWithTime.length, 4).setValues(rowsWithTime);
+    const rowsWithTime = cacheRows.map(function(r) { return [r[0], r[1], r[2], r[3], now]; });
+    cacheSheet.getRange(2, 1, rowsWithTime.length, 5).setValues(rowsWithTime);
   }
 
   Logger.log("[CACHE] Refresh complete — " + cacheRows.length + " variants written to '" + CACHE_SHEET_NAME + "'");
