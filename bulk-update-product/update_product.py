@@ -434,11 +434,15 @@ def read_inventory_csv(filepath: str) -> list[dict]:
     return rows
 
 
-def build_inventory_jsonl(quantities: list, jsonl_file: str, batch_size: int = 2500) -> int:
+def build_inventory_jsonl(quantities: list, jsonl_file: str, batch_size: int = 250) -> int:
     """Write JSONL for bulk inventory update.
     Each line = one inventorySetQuantities call with up to batch_size items.
     Returns number of lines written.
     """
+    # Shopify inventorySetQuantities supports at most 250 quantities per call.
+    if batch_size > 250:
+        batch_size = 250
+
     count = 0
     with open(jsonl_file, "w", encoding="utf-8") as f:
         for i in range(0, len(quantities), batch_size):
