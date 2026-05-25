@@ -1,3 +1,5 @@
+import argparse
+import os
 import requests
 import pandas as pd
 import time
@@ -15,12 +17,68 @@ def gql(query, variables=None):
     return _gql(API_URL, HEADERS, query, variables)
 
 
+def build_metafields(row):
+    standard_cols = {
+        "Handle", "Title", "Title TH", "Body (HTML)", "Body (HTML) TH",
+        "Vendor", "Type", "Tags", "Status", "Published",
+        "Option1 Name", "Option1 Value", "Option2 Name", "Option2 Value",
+        "Option3 Name", "Option3 Value", "Variant SKU", "Variant Price",
+        "Variant Grams", "Variant Weight Unit", "Variant Inventory Policy",
+        "Variant Requires Shipping", "Variant Taxable", "Variant Inventory Qty",
+        "Variant Compare At Price", "Variant Barcode", "Image Src",
+        "Image Position", "Image Alt Text", "Gift Card", "SEO Title",
+        "SEO Description"
+    }
+    metafields = []
+    for col in row.index:
+        if col in standard_cols:
+            continue
+        raw = get_val(row, col)
+        if not raw:
+            continue
+
+        namespace = None
+        key = None
+        if "." in col:
+            namespace, key = col.split(".", 1)
+        elif "_" in col:
+            namespace, key = col.split("_", 1)
+
+        if not namespace or not key:
+            continue
+
+        namespace = namespace.strip()
+        key = key.strip()
+        if not namespace or not key:
+            continue
+
+        metafields.append({
+            "namespace": namespace,
+            "key": key,
+            "value": raw,
+            "type": "single_line_text_field",
+        })
+    return metafields
+
+
 # ── Step 1: Create Product ────────────────────────────────────
 def create_product(row):
     input_data = {}
 
-    if v := get_val(row, "Title"):           input_data["title"] = v
-    if v := get_val(row, "Body (HTML)"):     input_data["descriptionHtml"] = v
+    title_eng = get_val(row, "Title")
+    title_th  = get_val(row, "Title TH")
+    if title_eng:
+        input_data["title"] = title_eng
+    elif title_th:
+        input_data["title"] = title_th
+
+    body_eng = get_val(row, "Body (HTML)")
+    body_th  = get_val(row, "Body (HTML) TH")
+    if body_eng:
+        input_data["descriptionHtml"] = body_eng
+    elif body_th:
+        input_data["descriptionHtml"] = body_th
+
     if v := get_val(row, "Vendor"):          input_data["vendor"] = v
     if v := get_val(row, "Type"):            input_data["productType"] = v
     if v := get_val(row, "Handle"):          input_data["handle"] = v
@@ -39,6 +97,9 @@ def create_product(row):
             options.append(opt)
     if options:
         input_data["productOptions"] = options
+
+    if metafields := build_metafields(row):
+        input_data["metafields"] = metafields
 
     mutation = """
     mutation productCreate($input: ProductInput!) {
@@ -73,6 +134,80 @@ def create_product(row):
     product["_default_variant_id"] = verts[0]["node"]["id"] if verts else None
     print(f"  ✅ Product created: {product.get('id')} | handle: {product.get('handle')}")
     return product
+
+
+def get_translatable_digests(resource_id):
+    query = """
+    query translatableResource($resourceId: ID!) {
+      translatableResource(resourceId: $resourceId) {
+        translatableContent { key digest }
+      }
+    }"""
+
+    body = gql(query, {"resourceId": resource_id})
+    if not body:
+        print("  ❌ Could not fetch translation digests")
+        return {}
+
+    resource = body.get("data", {}).get("translatableResource")
+    if not resource:
+        print("  ⚠️ No translatableResource returned")
+        return {}
+
+    return {
+        entry["key"]: entry["digest"]
+        for entry in resource.get("translatableContent", [])
+        if entry.get("key") and entry.get("digest")
+    }
+
+
+def register_thai_translations(product_id, row):
+    translations = []
+    if v := get_val(row, "Title TH"):
+        translations.append({"key": "title", "value": v, "locale": "th"})
+    if v := get_val(row, "Body (HTML) TH"):
+        translations.append({"key": "body_html", "value": v, "locale": "th"})
+    if not translations:
+        return
+
+    digests = get_translatable_digests(product_id)
+    print(f"  🔎 Translation digests: {list(digests.keys())}")
+
+    safe_translations = []
+    for translation in translations:
+        digest = digests.get(translation["key"])
+        if digest:
+            safe_translations.append({**translation, "translatableContentDigest": digest})
+        else:
+            print(f"  ⚠️ No digest for translation key: {translation['key']}")
+
+    if not safe_translations:
+        print("  ⚠️ No valid Thai translations to register")
+        return
+
+    mutation = """
+    mutation translationRegister($resourceId: ID!, $translations: [TranslationInput!]!) {
+      translationsRegister(resourceId: $resourceId, translations: $translations) {
+        translations { key locale }
+        userErrors { field message }
+      }
+    }"""
+
+    body = gql(mutation, {"resourceId": product_id, "translations": safe_translations})
+    if not body:
+        print("  ❌ No response from translation API")
+        return
+
+    if errors := body.get("errors"):
+        print(f"  ❌ Translation GraphQL errors: {errors}")
+        return
+
+    result = body.get("data", {}).get("translationsRegister", {})
+    if result.get("userErrors"):
+        print(f"  ⚠️ Translation userErrors: {result['userErrors']}")
+        return
+
+    print(f"  🈴 Thai translations registered: {[t['key'] for t in safe_translations]}")
 
 
 # ── Step 2: Create / Update Variant ─────────────────────────
@@ -170,19 +305,16 @@ def get_publication_ids():
     if _publication_ids_cache is not None:
         return _publication_ids_cache
 
-    query = "{ publications(first: 20) { edges { node { id name } } } }"
+    query = "{ publications(first: 50) { edges { node { id name } } } }"
     body = gql(query)
     if not body:
         return []
 
-    target_names = {"online store", "point of sale"}
-    ids = [
-        edge["node"]["id"]
-        for edge in body.get("data", {}).get("publications", {}).get("edges", [])
-        if edge["node"]["name"].lower() in target_names
-    ]
+    publication_edges = body.get("data", {}).get("publications", {}).get("edges", [])
+    ids = [edge["node"]["id"] for edge in publication_edges if edge.get("node", {}).get("id")]
+    names = [edge["node"].get("name") for edge in publication_edges if edge.get("node", {}).get("name")]
     _publication_ids_cache = ids
-    print(f"  📡 Publications found: {len(ids)}")
+    print(f"  📡 Publications found: {len(ids)} | {names}")
     return ids
 
 
@@ -290,11 +422,19 @@ def set_inventory(inventory_item_id, qty):
 
 # ── Main ──────────────────────────────────────────────────────
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Create new Shopify products from a CSV file.")
+    parser.add_argument("--csv", default="data/test_create.csv", help="Path to CSV file relative to bulk-update-product folder")
+    args = parser.parse_args()
+
     base_dir = os.path.dirname(__file__)
-    CSV_FILE = os.path.join(base_dir, "test_create.csv")
+    CSV_FILE = os.path.join(base_dir, args.csv)
+
+    if not os.path.exists(CSV_FILE):
+        raise FileNotFoundError(f"CSV file not found: {CSV_FILE}")
 
     df = read_csv_auto(CSV_FILE)
     df.columns = df.columns.str.strip()
+    print(f"CSV file: {CSV_FILE}")
     print(f"Columns found: {df.columns.tolist()}")
     print(f"📋 {len(df)} rows to create")
 
@@ -322,6 +462,10 @@ if __name__ == "__main__":
 
         # Step 2: Update default variant (or create if none)
         variant = create_variant(product_id, product_options, row, default_variant_id)
+
+        # Step 2b: Register Thai translations if provided
+        time.sleep(0.3)
+        register_thai_translations(product_id, row)
 
         # Step 3: Publish to Online Store + Point of Sale
         time.sleep(0.3)
