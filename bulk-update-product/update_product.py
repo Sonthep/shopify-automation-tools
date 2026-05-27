@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 import csv
 import json
 import os
@@ -18,7 +18,7 @@ LOCATION_ID = os.getenv("SHOPIFY_LOCATION_ID", "")
 # ── Column mapping (CSV header → Shopify field) ───────────────
 COL = {
     "product_gid":      "Product GID",
-    "variant_gid":      "VariantGID",
+    "variant_gid":      "Variant GID",
     "sku":              "Variant SKU",
     "title":            "Title",
     "body_html":        "Body (HTML)",
@@ -30,7 +30,7 @@ COL = {
     "price":              "Price",
     "compare_at_price":   "Compare At Price",
     "inventory_qty":      "Inventory quantity",
-    "inventory_item_id":  "InventoryItemId",
+    "inventory_item_id":  "Inventory Item ID",
 }
 
 # ── Thai translation ──────────────────────────────────────────

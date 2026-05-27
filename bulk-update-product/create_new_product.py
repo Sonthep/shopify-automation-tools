@@ -25,7 +25,7 @@ def build_metafields(row):
         "Option3 Name", "Option3 Value", "Variant SKU", "Variant Price",
         "Variant Grams", "Variant Weight Unit", "Variant Inventory Policy",
         "Variant Requires Shipping", "Variant Taxable", "Variant Inventory Qty",
-        "Variant Compare At Price", "Variant Barcode", "Image Src",
+        "Variant Compare At Price", "Compare At Price", "Variant Barcode", "Image Src",
         "Image Position", "Image Alt Text", "Gift Card", "SEO Title",
         "SEO Description"
     }
@@ -216,6 +216,8 @@ def create_variant(product_id, product_options, row, default_variant_id=None):
 
     if v := get_val(row, "Variant SKU"):   variant["inventoryItem"] = {"sku": v}
     if v := get_val(row, "Variant Price"): variant["price"] = v
+    if v := (get_val(row, "Compare At Price") or get_val(row, "Variant Compare At Price")):
+        variant["compareAtPrice"] = v
 
     # Weight
     weight_val  = get_val(row, "Variant Grams")
