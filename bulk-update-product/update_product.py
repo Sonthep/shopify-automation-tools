@@ -23,7 +23,7 @@ COL = {
     "title":            "Title",
     "body_html":        "Body (HTML)",
     "vendor":           "Vendor",
-    "product_type":     "Product Type",
+    "product_type":     "Type",
     "power_type":       "Power Type",
     "tags":             "Tags",
     "status":           "Status",

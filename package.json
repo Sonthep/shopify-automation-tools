@@ -1,6 +1,21 @@
 {
+  "name": "shopify-automation-tools",
+  "version": "1.0.0",
+  "description": "Shopify Admin API automation scripts — product updates, collections, menus",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "get-menus": "node scripts/get-menus.mjs",
+    "menus-to-csv": "node scripts/menus-to-csv.mjs",
+    "update-inventory": "node scripts/update_inventory_auto.js",
+    "create-collections": "node create-collection/create-collections.js",
+    "import-menu": "node menu-importer/import-menu.js",
+    "fetch-menu": "node menu-importer/fetch-menu.js",
+    "backup-menu": "node menu-importer/backup-menu.js"
+  },
   "dependencies": {
     "csv-parser": "^3.2.0",
     "node-fetch": "^2.7.0"
   }
 }
+

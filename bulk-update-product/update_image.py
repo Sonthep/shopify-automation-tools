@@ -120,30 +120,71 @@ def create_media(product_gid, image_urls):
 
 # ── Folder mode: scan folder, match filename → SKU ───────────
 def run_folder_mode(folder: str):
-    """ชื่อไฟล์ (ไม่มีนามสกุล) = SKU เช่น PIM1-IM-50SC.jpg → SKU: PIM1-IM-50SC"""
-    files = sorted([
-        os.path.join(folder, f)
-        for f in os.listdir(folder)
-        if os.path.splitext(f)[1].lower() in IMAGE_EXTS
-    ])
-    if not files:
-        print(f"❌ ไม่พบไฟล์รูปใน '{folder}'")
+    """รองรับ 2 รูปแบบ:
+    1) โฟลเดอร์ย่อยชื่อเป็น SKU แล้วอัปโหลดรูปทั้งหมดในโฟลเดอร์นั้น
+    2) (fallback เดิม) ชื่อไฟล์ = SKU เช่น PIM1-IM-50SC.jpg
+    """
+    if not os.path.isdir(folder):
+        print(f"❌ ไม่พบโฟลเดอร์: '{folder}'")
         return
 
-    # group by SKU (ชื่อไฟล์ไม่มีนามสกุล) — รองรับหลายรูปต่อ SKU
     from collections import defaultdict
+
+    # โหมดใหม่: โฟลเดอร์ย่อย = SKU
+    sku_dirs = sorted([
+        d for d in os.listdir(folder)
+        if os.path.isdir(os.path.join(folder, d))
+    ])
+
     sku_files: dict[str, list[str]] = defaultdict(list)
-    for fp in files:
-        sku = os.path.splitext(os.path.basename(fp))[0]
-        # ตัดหมายเลขลำดับท้าย เช่น PIM1-IM-50SC_2 → PIM1-IM-50SC
-        base_sku = sku.rsplit("_", 1)[0] if sku[-1].isdigit() and "_" in sku else sku
-        sku_files[base_sku].append(fp)
+    flat_files: list[str] = []
+    single_folder_sku: str | None = None
+    if sku_dirs:
+        for sku in sku_dirs:
+            sku_folder = os.path.join(folder, sku)
+            for root, _, filenames in os.walk(sku_folder):
+                for name in filenames:
+                    if os.path.splitext(name)[1].lower() in IMAGE_EXTS:
+                        sku_files[sku].append(os.path.join(root, name))
+
+            if not sku_files[sku]:
+                print(f"⚠️ ไม่มีไฟล์รูปในโฟลเดอร์ SKU: {sku_folder}")
+    else:
+        # โฟลเดอร์เดี่ยว: ใช้ชื่อโฟลเดอร์เป็น SKU ก่อน
+        files = sorted([
+            os.path.join(folder, f)
+            for f in os.listdir(folder)
+            if os.path.splitext(f)[1].lower() in IMAGE_EXTS
+        ])
+        if not files:
+            print(f"❌ ไม่พบไฟล์รูปใน '{folder}'")
+            return
+
+        flat_files = files
+        single_folder_sku = os.path.basename(os.path.normpath(folder)).strip()
+        if single_folder_sku:
+            sku_files[single_folder_sku] = files
+            print(f"🧭 Single-folder mode: ใช้ชื่อโฟลเดอร์เป็น SKU = {single_folder_sku}")
 
     skus = list(sku_files.keys())
+    total_files = sum(len(v) for v in sku_files.values())
     print(f"📂 Folder: {folder}")
-    print(f"📋 {len(skus)} SKU(s), {len(files)} file(s)")
+    print(f"📋 {len(skus)} SKU(s), {total_files} file(s)")
 
     gid_map = get_product_gids_by_skus(API_URL, HEADERS, skus)
+
+    # fallback เดิม: ถ้าใช้ชื่อโฟลเดอร์แล้วไม่เจอ SKU ค่อยจับคู่จากชื่อไฟล์แทน
+    if single_folder_sku and single_folder_sku not in gid_map:
+        print(f"⚠️ ไม่พบ SKU จากชื่อโฟลเดอร์: {single_folder_sku} -> ลองจับคู่จากชื่อไฟล์แทน")
+        sku_files = defaultdict(list)
+        for fp in flat_files:
+            sku = os.path.splitext(os.path.basename(fp))[0]
+            base_sku = sku.rsplit("_", 1)[0] if sku[-1].isdigit() and "_" in sku else sku
+            sku_files[base_sku].append(fp)
+
+        skus = list(sku_files.keys())
+        print(f"📋 Fallback filename mode: {len(skus)} SKU(s)")
+        gid_map = get_product_gids_by_skus(API_URL, HEADERS, skus)
 
     success = failed = 0
     for sku, fp_list in sku_files.items():
@@ -187,7 +228,7 @@ def run_folder_mode(folder: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Update product images from CSV or folder")
     group  = parser.add_mutually_exclusive_group()
-    group.add_argument("--folder", "-f", help="โฟลเดอร์รูปภาพ (ชื่อไฟล์ = SKU)")
+    group.add_argument("--folder", "-f", help="โฟลเดอร์รูปภาพ (รองรับโฟลเดอร์ย่อยชื่อ SKU)")
     group.add_argument("--csv",    "-c", help="CSV file path (default: data/update_image_set2.csv)")
     args = parser.parse_args()
 

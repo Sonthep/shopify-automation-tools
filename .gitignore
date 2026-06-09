@@ -1,11 +1,55 @@
 node_modules/
 .env
-create-collection/image\ logo.csv
-vendor-images/
 
-# Generated data files (do not commit)
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ============================================================
+# bulk-update-product: generated / large data files
+# ============================================================
+bulk-update-product/data/*.csv
+bulk-update-product/data/*.xlsx
+bulk-update-product/data/*.jsonl
+bulk-update-product/data/*.json
+
+# Keep sample / template files
+!bulk-update-product/data/*_sample*.csv
+!bulk-update-product/data/metafield_definitions.csv
+!bulk-update-product/data/metafield_definitions_*.csv
+
+bulk-update-product/output/
+bulk-update-product/cache/
 bulk-update-product/*.jsonl
 bulk-update-product/*.json
 bulk-update-product/not_found*.csv
 bulk-update-product/failed.csv
-bulk-update-product/__pycache__/
+
+# ============================================================
+# create-collection
+# ============================================================
+create-collection/image\ logo.csv
+vendor-images/
+create-collection/brand/
+create-collection/category/
+
+# ============================================================
+# menu-importer: generated / backup files
+# ============================================================
+menu-importer/menu-backup-*.csv
+menu-importer/menu-backup-*.json
+menu-importer/import-menu.csv
+menu-importer/update-cat-sp.csv
+
+# ============================================================
+# scripts: output files
+# ============================================================
+scripts/output/
+
+# ============================================================
+# OS / Editor
+# ============================================================
+.DS_Store
+Thumbs.db
+*.rar

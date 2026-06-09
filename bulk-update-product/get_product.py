@@ -138,7 +138,6 @@ def build_rows(lines: list[dict]) -> list[dict]:
     products: dict[str, dict]      = {}
     variants: dict[str, dict]      = {}   # product_gid → first variant only
     meta:     dict[str, dict]      = defaultdict(dict)  # product_gid → {ns.key: value}
-    images:   dict[str, str]       = {}   # product_gid → url
 
     for obj in lines:
         gid    = obj.get("id", "")
@@ -149,13 +148,10 @@ def build_rows(lines: list[dict]) -> list[dict]:
         elif "/ProductVariant/" in gid and parent:
             if parent not in variants:
                 variants[parent] = obj
-        elif "/Metafield/" in gid and parent:
+        elif "namespace" in obj and "key" in obj and parent:
             ns  = obj.get("namespace", "")
             key = obj.get("key", "")
             meta[parent][f"{ns}.{key}"] = obj.get("value", "")
-        elif obj.get("url", "").startswith("http") and parent:
-            if parent not in images:
-                images[parent] = obj.get("url", "")
 
     rows = []
     for pid, p in products.items():
@@ -172,16 +168,17 @@ def build_rows(lines: list[dict]) -> list[dict]:
             "Title":             p.get("title", ""),
             "Body (HTML)":       p.get("descriptionHtml", ""),
             "Vendor":            p.get("vendor", ""),
-            "Product Type":      p.get("productType", ""),
+            "Type":              p.get("productType", ""),
             "Tags":              ", ".join(p.get("tags") or []),
             "Status":            p.get("status", ""),
             "Published":         "TRUE" if p.get("publishedAt") else "FALSE",
             "Price":             v.get("price", ""),
             "Compare At Price":  v.get("compareAtPrice", "") or "",
-            "Image Src":         images.get(pid, ""),
+            "Image Src":         (p.get("featuredImage") or {}).get("url", ""),
             "SEO Title":         (p.get("seo") or {}).get("title", ""),
             "SEO Description":   (p.get("seo") or {}).get("description", ""),
             "Category":          (p.get("category") or {}).get("fullName", ""),
+            "custom.good_id":    mf.get("custom.good_id", ""),
         }
         row.update(mf)
         rows.append(row)
