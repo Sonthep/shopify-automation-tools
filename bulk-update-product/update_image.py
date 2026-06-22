@@ -174,7 +174,7 @@ def run_folder_mode(folder: str):
     gid_map = get_product_gids_by_skus(API_URL, HEADERS, skus)
 
     # fallback เดิม: ถ้าใช้ชื่อโฟลเดอร์แล้วไม่เจอ SKU ค่อยจับคู่จากชื่อไฟล์แทน
-    if single_folder_sku and single_folder_sku not in gid_map:
+    if single_folder_sku and not gid_map.get(single_folder_sku):
         print(f"⚠️ ไม่พบ SKU จากชื่อโฟลเดอร์: {single_folder_sku} -> ลองจับคู่จากชื่อไฟล์แทน")
         sku_files = defaultdict(list)
         for fp in flat_files:

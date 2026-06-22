@@ -130,14 +130,18 @@ def download_jsonl(url: str) -> list[dict]:
 def build_rows(lines: list[dict]) -> list[dict]:
     """
     Bulk JSONL with edges/node structure:
-      - Product lines   : no __parentId  (from edges.node)
+      - Product lines   : no __parentId
       - Variant lines   : __parentId = product GID
-      - Metafield lines : __parentId = product GID
-      - Image lines     : __parentId = product GID
+      - Metafield lines : __parentId = product GID (namespace+key fields)
+      - Variant metafield lines : __parentId = variant GID
+
+    Output: 1 row per variant (Shopify standard format).
+    Product-level fields are duplicated for each variant row.
+    Products with no variants still produce 1 row with empty variant columns.
     """
-    products: dict[str, dict]      = {}
-    variants: dict[str, dict]      = {}   # product_gid → first variant only
-    meta:     dict[str, dict]      = defaultdict(dict)  # product_gid → {ns.key: value}
+    products: dict[str, dict]           = {}
+    variants: dict[str, list[dict]]     = defaultdict(list)  # product_gid → [variant, ...]
+    meta:     dict[str, dict]           = defaultdict(dict)  # product_gid → {ns.key: value}
 
     for obj in lines:
         gid    = obj.get("id", "")
@@ -146,44 +150,49 @@ def build_rows(lines: list[dict]) -> list[dict]:
         if "/Product/" in gid and not parent:
             products[gid] = obj
         elif "/ProductVariant/" in gid and parent:
-            if parent not in variants:
-                variants[parent] = obj
+            variants[parent].append(obj)
         elif "namespace" in obj and "key" in obj and parent:
+            # Metafield — keyed by its parent (product or variant GID)
             ns  = obj.get("namespace", "")
             key = obj.get("key", "")
             meta[parent][f"{ns}.{key}"] = obj.get("value", "")
 
     rows = []
     for pid, p in products.items():
-        v   = variants.get(pid, {})
-        mf  = meta.get(pid, {})
-        inv = (v.get("inventoryItem") or {}).get("id", "")
+        mf            = meta.get(pid, {})
+        product_variants = variants.get(pid) or [{}]  # at least one empty row
 
-        row = {
-            "Product GID":       pid,
-            "Variant GID":       v.get("id", ""),
-            "Inventory Item ID": inv,
-            "Variant SKU":       v.get("sku", ""),
-            "Handle":            p.get("handle", ""),
-            "Title":             p.get("title", ""),
-            "Body (HTML)":       p.get("descriptionHtml", ""),
-            "Vendor":            p.get("vendor", ""),
-            "Type":              p.get("productType", ""),
-            "Tags":              ", ".join(p.get("tags") or []),
-            "Status":            p.get("status", ""),
-            "Published":         "TRUE" if p.get("publishedAt") else "FALSE",
-            "Price":             v.get("price", ""),
-            "Compare At Price":  v.get("compareAtPrice", "") or "",
-            "Image Src":         (p.get("featuredImage") or {}).get("url", ""),
-            "SEO Title":         (p.get("seo") or {}).get("title", ""),
-            "SEO Description":   (p.get("seo") or {}).get("description", ""),
-            "Category":          (p.get("category") or {}).get("fullName", ""),
-            "custom.good_id":    mf.get("custom.good_id", ""),
-        }
-        row.update(mf)
-        rows.append(row)
+        for v in product_variants:
+            vid = v.get("id", "")
+            inv = (v.get("inventoryItem") or {}).get("id", "")
+            vmf = meta.get(vid, {})  # variant-level metafields (if any)
 
-    print(f"  {len(rows)} products parsed")
+            row = {
+                "Product GID":       pid,
+                "Variant GID":       vid,
+                "Inventory Item ID": inv,
+                "Variant SKU":       v.get("sku", ""),
+                "Handle":            p.get("handle", ""),
+                "Title":             p.get("title", ""),
+                "Body (HTML)":       p.get("descriptionHtml", ""),
+                "Vendor":            p.get("vendor", ""),
+                "Type":              p.get("productType", ""),
+                "Tags":              ", ".join(p.get("tags") or []),
+                "Status":            p.get("status", ""),
+                "Published":         "TRUE" if p.get("publishedAt") else "FALSE",
+                "Price":             v.get("price", ""),
+                "Compare At Price":  v.get("compareAtPrice", "") or "",
+                "Image Src":         (p.get("featuredImage") or {}).get("url", ""),
+                "SEO Title":         (p.get("seo") or {}).get("title", ""),
+                "SEO Description":   (p.get("seo") or {}).get("description", ""),
+                "Category":          (p.get("category") or {}).get("fullName", ""),
+                "custom.good_id":    mf.get("custom.good_id", ""),
+            }
+            row.update(mf)   # product metafields
+            row.update(vmf)  # variant metafields (overrides if same key)
+            rows.append(row)
+
+    print(f"  {len(rows)} variant rows parsed")
     return rows
 
 
