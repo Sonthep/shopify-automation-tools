@@ -52,6 +52,7 @@ INNER_QUERY = """
               sku
               price
               compareAtPrice
+              inventoryQuantity
               inventoryItem { id }
             }
           }
@@ -182,6 +183,7 @@ def build_rows(lines: list[dict]) -> list[dict]:
                 "Published":         "TRUE" if p.get("publishedAt") else "FALSE",
                 "Price":             v.get("price", ""),
                 "Compare At Price":  v.get("compareAtPrice", "") or "",
+                "Inventory":         v.get("inventoryQuantity", ""),
                 "Image Src":         (p.get("featuredImage") or {}).get("url", ""),
                 "SEO Title":         (p.get("seo") or {}).get("title", ""),
                 "SEO Description":   (p.get("seo") or {}).get("description", ""),
