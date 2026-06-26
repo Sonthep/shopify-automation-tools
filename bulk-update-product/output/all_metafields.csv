@@ -1,11 +1,10 @@
 ﻿name,key,type
 Compatible With,custom.compatible_with,list.single_line_text_field
-FLIPHTML5,custom.fliphtml5,url
 Good ID,custom.good_id,single_line_text_field
 LInk pdf,custom.link_pdf,url
 Product Type,custom.part_type,single_line_text_field
 Power Type,custom.power_type,single_line_text_field
-Spec Sheet,custom.spec_sheet,file_reference
+spapart or product,custom.spapart_or_product,single_line_text_field
 Bought together products,globo--filter--product_recommendation.bought_together_products,list.product_reference
 Complementary products,globo--filter--product_recommendation.complementary_products,list.product_reference
 Related products,globo--filter--product_recommendation.related_products,list.product_reference
@@ -13,10 +12,18 @@ Complementary products,shopify--discovery--product_recommendation.complementary_
 Related products,shopify--discovery--product_recommendation.related_products,list.product_reference
 Related products settings,shopify--discovery--product_recommendation.related_products_display,single_line_text_field
 Search product boosts,shopify--discovery--product_search_boost.queries,list.single_line_text_field
+Abrasive material,shopify.abrasive-material,list.metaobject_reference
 Age group,shopify.age-group,list.metaobject_reference
+Angles supported,shopify.angles-supported,list.metaobject_reference
 Color,shopify.color-pattern,list.metaobject_reference
+Control type,shopify.control-type,list.metaobject_reference
+Cooking compartments,shopify.cooking-compartments,list.metaobject_reference
 Material,shopify.material,list.metaobject_reference
+Mounting type,shopify.mounting-type,list.metaobject_reference
+Power source,shopify.power-source,list.metaobject_reference
+Roaster oven functions,shopify.roaster-oven-functions,list.metaobject_reference
 Target gender,shopify.target-gender,list.metaobject_reference
+Top surface material,shopify.top-surface-material,list.metaobject_reference
 Accessories,specs.accessories,single_line_text_field
 Ampere,specs.ampere,number_decimal
 Boiler Heating Element (W),specs.boiler_heating_element_w,number_integer

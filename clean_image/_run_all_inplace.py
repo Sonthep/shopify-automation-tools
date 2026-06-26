@@ -5,7 +5,7 @@ from rembg import remove, new_session
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 SUPPORTED_EXT = (".png", ".jpg", ".jpeg", ".webp")
-ROOT = r".\รวมสินค้า"
+ROOT = r"W:\25.WEBSITE\Sp_Website\รูปภาพอะไหล่ 25-06-69\รูปภาพอะไหล่ 25-06-69"
 CANVAS = 800
 PRODUCT = 500
 QUALITY = 85
