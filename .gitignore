@@ -26,6 +26,16 @@ bulk-update-product/*.json
 bulk-update-product/not_found*.csv
 bulk-update-product/failed.csv
 
+# images: temp image folders
+bulk-update-product/images/update_image/
+bulk-update-product/images/data/
+
+# pdf-international: local PDF assets
+bulk-update-product/pdf-international/
+
+# clean_image: separate venv (redundant with root)
+clean_image/.venv/
+
 # ============================================================
 # create-collection
 # ============================================================
