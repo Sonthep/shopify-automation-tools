@@ -1,4 +1,4 @@
-﻿import sys, os as _os
+import sys, os as _os
 sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 
 import sys
@@ -32,6 +32,7 @@ COL = {
     "status":           "Status",
     "price":              "Price",
     "compare_at_price":   "Compare At Price",
+    "new_sku":            "New SKU",
     "inventory_qty":      "Inventory quantity",
     "inventory_item_id":  "Inventory Item ID",
 }
@@ -106,18 +107,23 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, list, list]:
                     "quantity":        int(float(qty)),
                 })
 
-            # ── Price (direct Variant GID) ──
+            # ── Price / SKU (direct Variant GID) ──
             price         = get_val(row, COL["price"])
             compare_price = get_val(row, COL["compare_at_price"])
-            if price or compare_price:
+            new_sku       = get_val(row, COL["new_sku"]) if "new_sku" in COL and COL["new_sku"] in df.columns else None
+
+            if price or compare_price or new_sku:
                 variant_gid = get_val(row, var_gid_col) if var_gid_col in df.columns else None
                 if variant_gid:
-                    price_entries.append({
+                    entry = {
                         "productId":      gid,
                         "variantId":      variant_gid,
                         "price":          price,
                         "compareAtPrice": compare_price,
-                    })
+                    }
+                    if new_sku:
+                        entry["sku"] = new_sku
+                    price_entries.append(entry)
 
             if len(input_data) <= 1:
                 continue
@@ -172,6 +178,8 @@ def build_price_jsonl(price_entries: list, jsonl_file: str) -> int:
                 variant_input["price"] = entry["price"]
             if entry.get("compareAtPrice") is not None:
                 variant_input["compareAtPrice"] = entry["compareAtPrice"]
+            if entry.get("sku") is not None:
+                variant_input["inventoryItem"] = {"sku": entry["sku"]}
             f.write(json.dumps({"productId": entry["productId"], "variants": [variant_input]}) + "\n")
             count += 1
     print(f"{count} price rows -> {jsonl_file}")
@@ -184,7 +192,7 @@ def run_price_bulk_mutation(resource_url: str) -> dict | None:
       bulkOperationRunMutation(
         mutation: "mutation variantPriceUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
           productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-            productVariants { id price compareAtPrice }
+            productVariants { id price compareAtPrice sku }
             userErrors { field message }
           }
         }",
@@ -532,7 +540,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     base_dir   = os.path.dirname(__file__)
-    CSV_FILE   = args.csv if os.path.isabs(args.csv) else os.path.join(base_dir, args.csv)
+    
+    # Resolve CSV path
+    if os.path.exists(args.csv):
+        CSV_FILE = args.csv
+    else:
+        CSV_FILE = os.path.join(os.path.dirname(base_dir), args.csv)
+        
     JSONL_FILE = os.path.join(base_dir, "output", "bulk.jsonl")
     os.makedirs(os.path.join(base_dir, "output"), exist_ok=True)
 
