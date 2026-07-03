@@ -1,4 +1,4 @@
-﻿"""
+"""
 Export ALL Shopify products to Excel via Bulk Operation API.
 
 Fetches: id, handle, title, descriptionHtml, vendor, productType, tags,
@@ -40,6 +40,7 @@ INNER_QUERY = """
         id
         handle
         title
+        description
         descriptionHtml
         vendor
         productType
@@ -172,10 +173,11 @@ def build_rows(lines: list[dict]) -> list[dict]:
             vmf = meta.get(vid, {})  # variant-level metafields (if any)
 
             row = {
+                "custom.good_id":    mf.get("custom.good_id", ""),
+                "Variant SKU":       v.get("sku", ""),
                 "Product GID":       pid,
                 "Variant GID":       vid,
                 "Inventory Item ID": inv,
-                "Variant SKU":       v.get("sku", ""),
                 "Handle":            p.get("handle", ""),
                 "Title":             p.get("title", ""),
                 "Body (HTML)":       p.get("descriptionHtml", ""),
@@ -188,10 +190,9 @@ def build_rows(lines: list[dict]) -> list[dict]:
                 "Compare At Price":  v.get("compareAtPrice", "") or "",
                 "Inventory":         v.get("inventoryQuantity", ""),
                 "Image Src":         (p.get("featuredImage") or {}).get("url", ""),
-                "SEO Title":         (p.get("seo") or {}).get("title", ""),
-                "SEO Description":   (p.get("seo") or {}).get("description", ""),
+                "SEO Title":         (p.get("seo") or {}).get("title") or "",
+                "SEO Description":   (p.get("seo") or {}).get("description") or "",
                 "Category":          (p.get("category") or {}).get("fullName", ""),
-                "custom.good_id":    mf.get("custom.good_id", ""),
             }
             row.update(mf)   # product metafields
             row.update(vmf)  # variant metafields (overrides if same key)

@@ -86,12 +86,6 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, list, list]:
                 input_data["vendor"] = v
             if v := get_val(row, COL["product_type"]):
                 input_data["productType"] = v
-                input_data.setdefault("metafields", []).append({
-                    "namespace": "custom",
-                    "key":       "part_type",
-                    "value":     v,
-                    "type":      "single_line_text_field",
-                })
             if v := get_val(row, COL["tags"]):
                 input_data["tags"] = [t.strip() for t in v.split(",")]
             if v := get_val(row, COL["status"]):

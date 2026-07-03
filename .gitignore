@@ -63,3 +63,17 @@ scripts/output/
 .DS_Store
 Thumbs.db
 *.rar
+
+# Ignored data and images
+*.xlsx
+*.csv
+download/image_form_abroad/
+download/images_batch27/
+download/canva_test_folder/
+
+# Ignored data and images
+*.xlsx
+*.csv
+download/image_form_abroad/
+download/images_batch27/
+download/canva_test_folder/
