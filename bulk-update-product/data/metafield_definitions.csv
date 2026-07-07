@@ -1,4 +1,0 @@
-﻿name,namespace,key,type,description,filterable
-Wattage,specs,wattage,single_line_text_field,,TRUE
-Voltage,specs,voltage,single_line_text_field,,TRUE
-Weight (kg),specs,weight_kg,single_line_text_field,,TRUE
