@@ -1,6 +1,7 @@
 import sys
 import os
 import time
+import argparse
 import requests
 import mimetypes
 
@@ -160,22 +161,30 @@ def upload_image_for_sku(sku, file_path):
     return True
 
 def main():
-    if not os.path.exists(IMAGE_FOLDER):
-        print(f"Image folder not found: {IMAGE_FOLDER}")
+    parser = argparse.ArgumentParser(description="Upload images to Shopify products by SKU.")
+    parser.add_argument("--folder", default=IMAGE_FOLDER, help="Path to folder containing images (filename = SKU)")
+    parser.add_argument("--limit", type=int, default=None, help="Limit number of files to process (for testing)")
+    args = parser.parse_args()
+
+    folder = args.folder
+    limit  = args.limit or LIMIT
+
+    if not os.path.exists(folder):
+        print(f"Image folder not found: {folder}")
         return
 
-    files = [f for f in os.listdir(IMAGE_FOLDER) if os.path.isfile(os.path.join(IMAGE_FOLDER, f))]
+    files = [f for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))]
     print(f"Found {len(files)} files to upload.")
     
-    if LIMIT:
-        files = files[:LIMIT]
-        print(f"Testing on first {LIMIT} files.")
+    if limit:
+        files = files[:limit]
+        print(f"Testing on first {limit} files.")
         
     success_count = 0
     fail_count = 0
     
     for f in files:
-        file_path = os.path.join(IMAGE_FOLDER, f)
+        file_path = os.path.join(folder, f)
         # SKU is filename without extension (and we might need to revert any safe filename transformations if they lost data, 
         # but normally the SKU is the exact filename. Wait, we replaced invalid chars with '_'. 
         # If the SKU in Shopify had '/', the filename has '_'. This might cause lookup to fail!

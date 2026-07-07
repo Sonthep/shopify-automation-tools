@@ -1,4 +1,4 @@
-﻿import sys, os as _os
+import sys, os as _os
 sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 
 import argparse
@@ -65,7 +65,7 @@ def build_metafields(row):
 
 
 # ── Step 1: Create Product ────────────────────────────────────
-def create_product(row):
+def create_product(row, sku=""):
     input_data = {}
 
     title_eng = get_val(row, "Title")
@@ -124,8 +124,26 @@ def create_product(row):
 
     result = body.get("data", {}).get("productCreate", {})
     if result.get("userErrors"):
-        print(f"  ⚠️ userErrors: {result['userErrors']}")
-        return None
+        errors = result["userErrors"]
+        handle_conflict = any(
+            "handle" in str(e.get("field", "")) and "already in use" in e.get("message", "")
+            for e in errors
+        )
+        if handle_conflict and sku and "handle" in input_data:
+            safe_sku = sku.lower().replace("/", "-").replace(".", "-")
+            new_handle = f"{input_data['handle']}-{safe_sku}"
+            input_data["handle"] = new_handle
+            print(f"  🔁 Handle conflict → retry with: {new_handle}")
+            body = gql(mutation, {"input": input_data})
+            if not body:
+                return None
+            result = body.get("data", {}).get("productCreate", {})
+            if result.get("userErrors"):
+                print(f"  ❌ Retry failed: {result['userErrors']}")
+                return None
+        else:
+            print(f"  ⚠️ userErrors: {errors}")
+            return None
 
     product = result.get("product")
     if not product:
@@ -302,6 +320,7 @@ def create_variant(product_id, product_options, row, default_variant_id=None):
 
 # ── Step 3: Publish to Sales Channels ────────────────────────
 _publication_ids_cache = None
+_location_id_cache = None
 
 def get_publication_ids():
     global _publication_ids_cache
@@ -379,19 +398,20 @@ def add_images(product_id, row):
 
 # ── Step 4: Set Inventory ─────────────────────────────────────
 def set_inventory(inventory_item_id, qty):
-    # Get location
-    loc_query = "{ locations(first: 1) { edges { node { id name } } } }"
-    body = gql(loc_query)
-    if not body:
-        return
-
-    loc_edges = body.get("data", {}).get("locations", {}).get("edges", [])
-    if not loc_edges:
-        print("  ⚠️ No location found")
-        return
-
-    location_id = loc_edges[0]["node"]["id"]
-    print(f"  📍 Location: {loc_edges[0]['node']['name']}")
+    global _location_id_cache
+    # Get location (cached — only fetched once)
+    if _location_id_cache is None:
+        loc_query = "{ locations(first: 1) { edges { node { id name } } } }"
+        body = gql(loc_query)
+        if not body:
+            return
+        loc_edges = body.get("data", {}).get("locations", {}).get("edges", [])
+        if not loc_edges:
+            print("  ⚠️ No location found")
+            return
+        _location_id_cache = loc_edges[0]["node"]["id"]
+        print(f"  📍 Location: {loc_edges[0]['node']['name']}")
+    location_id = _location_id_cache
 
     mutation = """
     mutation inventorySet($input: InventorySetQuantitiesInput!) {
@@ -447,11 +467,11 @@ if __name__ == "__main__":
 
     for idx, row in df.iterrows():
         title = get_val(row, "Title") or "(no title)"
-        sku   = get_val(row, "Variant SKU") or "(no SKU)"
-        print(f"\n🔄 [{idx+1}/{len(df)}] Creating: {title} | SKU: {sku}")
+        sku   = get_val(row, "Variant SKU") or ""
+        print(f"\n🔄 [{idx+1}/{len(df)}] Creating: {title} | SKU: {sku or '(no SKU)'}")
 
         # Step 1: Create product
-        product = create_product(row)
+        product = create_product(row, sku=sku)
         if not product:
             failed += 1
             failed_rows.append({"index": idx, "Title": title, "Variant SKU": sku})
@@ -461,21 +481,16 @@ if __name__ == "__main__":
         product_options    = product.get("options", [])
         default_variant_id = product.get("_default_variant_id")
 
-        time.sleep(0.3)
-
         # Step 2: Update default variant (or create if none)
         variant = create_variant(product_id, product_options, row, default_variant_id)
 
         # Step 2b: Register Thai translations if provided
-        time.sleep(0.3)
         register_thai_translations(product_id, row)
 
         # Step 3: Publish to Online Store + Point of Sale
-        time.sleep(0.3)
         publish_product(product_id)
 
         # Step 4: Add images
-        time.sleep(0.3)
         add_images(product_id, row)
 
         # Step 5: Set inventory
@@ -483,11 +498,10 @@ if __name__ == "__main__":
         if qty and variant:
             inventory_item_id = variant.get("inventoryItem", {}).get("id")
             if inventory_item_id:
-                time.sleep(0.3)
                 set_inventory(inventory_item_id, qty)
 
         success += 1
-        time.sleep(0.5)
+        time.sleep(0.5)  # ป้องกัน rate limit (Shopify: 2 req/s)
 
     if failed_rows:
         pd.DataFrame(failed_rows).to_csv("failed.csv", index=False)

@@ -1,6 +1,7 @@
-﻿import sys, os as _os
+import sys, os as _os
 sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 
+import argparse
 import pandas as pd
 import time
 import os
@@ -31,15 +32,22 @@ def delete_product(product_gid):
 
 # ── Main ──────────────────────────────────────────────────────
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Delete Shopify products from a CSV file.")
+    parser.add_argument("--csv", default="data/delete21469.csv", help="Path to CSV file (must have 'ProductGID' column)")
+    args = parser.parse_args()
+
     base_dir = os.path.dirname(__file__)
-    CSV_FILE = os.path.join(base_dir, "data", "delete21469.csv")  # ต้องมี column "ProductGID"
+    CSV_FILE = os.path.join(base_dir, args.csv)
+
+    if not os.path.exists(CSV_FILE):
+        raise FileNotFoundError(f"CSV file not found: {CSV_FILE}")
 
     df = read_csv_auto(CSV_FILE)
     print(f"Columns found: {df.columns.tolist()}")
 
-    gid_col = "ProductGID"
-    if gid_col not in df.columns:
-        print(f"❌ Cannot find ProductGID column. Available: {df.columns.tolist()}")
+    gid_col = next((c for c in df.columns if c.strip().replace(" ", "").lower() == "productgid"), None)
+    if not gid_col:
+        print(f"❌ Cannot find 'Product GID' column. Available: {df.columns.tolist()}")
         exit(1)
 
     gids = df[gid_col].dropna().tolist()
