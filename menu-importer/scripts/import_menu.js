@@ -1,12 +1,13 @@
-const fs = require('fs');
-require('dotenv').config();
+const fs   = require('fs');
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 
 // Read configuration from environment (with sensible fallbacks)
 const SHOP = process.env.SHOP || process.env.SHOP_NAME || 'sevenfive-4062.myshopify.com';
 const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN_IMPORT_MENU || process.env.SHOPIFY_ACCESS_TOKEN || '';
 const MENU_ID = process.env.MENU_ID || 'gid://shopify/Menu/245262352583';
 
-const csv = fs.readFileSync('import-menu.csv', 'utf8');
+const csv = fs.readFileSync(path.resolve(__dirname, '../data/import_menu.csv'), 'utf8');
 const lines = csv.trim().split('\n');
 const headers = lines[0].split(',');
 const rows = lines.slice(1).map(line => {

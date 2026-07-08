@@ -1,7 +1,8 @@
-// backup-menu.js
-// Usage: copy .env.example to .env and set tokens, or set env vars in shell
-const fs = require('fs');
-require('dotenv').config();
+// backup_menu.js
+// Usage: node scripts/backup_menu.js (from menu-importer/ root)
+const fs   = require('fs');
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 
 const SHOP    = process.env.SHOP || process.env.SHOP_NAME || 'sevenfive-4062.myshopify.com';
 const TOKEN   = process.env.SHOPIFY_ACCESS_TOKEN_IMPORT_MENU || process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_TOKEN || '';
@@ -46,14 +47,15 @@ async function backupMenu() {
     process.exit(1);
   }
 
-  // Save JSON backup
+  // Save JSON backup → backups/
+  const backupsDir = path.resolve(__dirname, '../backups');
+  if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const filename = `menu-backup-${timestamp}.json`;
+  const filename = path.join(backupsDir, `menu-backup-${timestamp}.json`);
   fs.writeFileSync(filename, JSON.stringify(menu, null, 2));
   console.log(`✅ Backup saved: ${filename}`);
 
-  // Save CSV backup (สำหรับ restore ผ่าน import-menu.js)
-  const csvFilename = `menu-backup-${timestamp}.csv`;
+  const csvFilename = path.join(backupsDir, `menu-backup-${timestamp}.csv`);
   const csvLines = ['Parent Menu Item Title,Menu Item Title,Menu Item Type,Menu Item URL'];
 
   function itemsToCSV(items, parentTitle = '') {

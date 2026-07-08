@@ -132,6 +132,14 @@ def download_jsonl(url: str) -> list[dict]:
 
 # ── Step 4: Build flat rows ───────────────────────────────────
 
+def _to_int(value):
+    """Convert value to int if possible, otherwise return empty string."""
+    try:
+        return int(float(str(value).strip()))
+    except (ValueError, TypeError):
+        return ""
+
+
 def build_rows(lines: list[dict]) -> list[dict]:
     """
     Bulk JSONL with edges/node structure:
@@ -173,7 +181,7 @@ def build_rows(lines: list[dict]) -> list[dict]:
             vmf = meta.get(vid, {})  # variant-level metafields (if any)
 
             row = {
-                "custom.good_id":    mf.get("custom.good_id", ""),
+                "custom.good_id":    _to_int(mf.get("custom.good_id", "")),
                 "Variant SKU":       v.get("sku", ""),
                 "Product GID":       pid,
                 "Variant GID":       vid,

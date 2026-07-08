@@ -1,10 +1,11 @@
-// import-menu.js
+// merge_and_update.js
 // Usage:
-//   SHOPIFY_TOKEN=REDACTED_SHOPIFY_TOKEN node import-menu.js --dry-run
-//   SHOPIFY_TOKEN=REDACTED_SHOPIFY_TOKEN node import-menu.js
+//   node scripts/merge_and_update.js --dry-run
+//   node scripts/merge_and_update.js
 
-const fs = require('fs');
-require('dotenv').config();
+const fs   = require('fs');
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const SHOP        = process.env.SHOP || process.env.SHOP_NAME || 'sevenfive-4062.myshopify.com';

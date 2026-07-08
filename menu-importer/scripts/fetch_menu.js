@@ -1,5 +1,6 @@
 const fetch = globalThis.fetch || require('node-fetch');
-require('dotenv').config();
+const path  = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 
 const SHOP = process.env.SHOP || process.env.SHOP_NAME || 'sevenfive-4062.myshopify.com';
 const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN_IMPORT_MENU || process.env.SHOPIFY_ACCESS_TOKEN || process.env.SHOPIFY_TOKEN || '';
