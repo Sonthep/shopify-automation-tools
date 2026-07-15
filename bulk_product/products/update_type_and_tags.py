@@ -1,10 +1,13 @@
 """
-Bulk update productType and tags for Shopify products via Bulk Mutation API.
+Bulk update productType, tags, and custom metafields for Shopify products
+via Bulk Mutation API.
 
 Required CSV columns:
-  - Product GID  : Shopify product GID (e.g. gid://shopify/Product/12345)
-  - Type         : New product type (leave blank to skip updating Type)
-  - Tags         : Comma-separated tags (leave blank to skip updating Tags)
+  - Product GID       : Shopify product GID (e.g. gid://shopify/Product/12345)
+  - Type              : New product type (leave blank to skip)
+  - Tags              : Comma-separated tags (leave blank to skip)
+  - custom.part_type  : Value for metafield custom.part_type  (leave blank to skip)
+  - custom.power_type : Value for metafield custom.power_type (leave blank to skip)
 
 Usage:
     py update_type_and_tags.py --csv output/products_export.xlsx
@@ -26,23 +29,35 @@ from utils import make_headers, gql, read_csv_auto, API_URL, get_val
 HEADERS  = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 BASE_DIR = os.path.dirname(__file__)
 
-GID_COLUMN  = "Product GID"
-TYPE_COLUMN = "Type"
-TAGS_COLUMN = "Tags"
+GID_COLUMN        = "Product GID"
+TYPE_COLUMN       = "Type"
+TAGS_COLUMN       = "Tags"
+PART_TYPE_COLUMN  = "custom.part_type"
+POWER_TYPE_COLUMN = "custom.power_type"
+
+# Metafield definitions: (column_name, namespace, key, type)
+METAFIELD_COLUMNS = [
+    (PART_TYPE_COLUMN,  "custom", "part_type",  "single_line_text_field"),
+    (POWER_TYPE_COLUMN, "custom", "power_type", "single_line_text_field"),
+]
 
 
 # ── Step 1: Build JSONL ───────────────────────────────────────
 
 def build_jsonl(df: pd.DataFrame, out_jsonl: str) -> int:
-    """Build JSONL file for updating productType and tags from CSV.
+    """Build JSONL file for updating productType, tags, and custom metafields from CSV.
 
     Rules:
-      - Type column present & not blank  → set productType to that value
-      - Type column present & blank      → clear productType (set to "")
-      - Type column missing              → skip productType field
-      - Tags column present & not blank  → set tags to split list
-      - Tags column present & blank      → clear all tags (set to [])
-      - Tags column missing              → skip tags field
+      - Type column present & not blank       → set productType to that value
+      - Type column present & blank           → clear productType (set to "")
+      - Type column missing                   → skip productType field
+      - Tags column present & not blank       → set tags to split list
+      - Tags column present & blank           → clear all tags (set to [])
+      - Tags column missing                   → skip tags field
+      - custom.part_type / custom.power_type
+          column present & not blank          → upsert metafield
+          column present & blank              → skip (no change)
+          column missing                      → skip
     """
     if GID_COLUMN not in df.columns:
         print(f"[ERR] Need '{GID_COLUMN}' column in CSV.")
@@ -52,9 +67,12 @@ def build_jsonl(df: pd.DataFrame, out_jsonl: str) -> int:
     skipped = 0
     has_type = TYPE_COLUMN in df.columns
     has_tags = TAGS_COLUMN in df.columns
+    has_meta = [(col, ns, key, vtype) for col, ns, key, vtype in METAFIELD_COLUMNS
+                if col in df.columns]
 
-    if not has_type and not has_tags:
-        print(f"[ERR] CSV must have at least one of '{TYPE_COLUMN}' or '{TAGS_COLUMN}' columns.")
+    if not has_type and not has_tags and not has_meta:
+        print(f"[ERR] CSV must have at least one of: '{TYPE_COLUMN}', '{TAGS_COLUMN}', "
+              f"'{PART_TYPE_COLUMN}', '{POWER_TYPE_COLUMN}'.")
         sys.exit(1)
 
     os.makedirs(os.path.dirname(out_jsonl), exist_ok=True)
@@ -83,6 +101,23 @@ def build_jsonl(df: pd.DataFrame, out_jsonl: str) -> int:
                         input_data["tags"] = [t.strip() for t in tags_str.split(",") if t.strip()]
                     else:
                         input_data["tags"] = []  # clear all tags
+
+            # ── Custom Metafields ──
+            if has_meta:
+                metafields = []
+                for col, namespace, key, value_type in has_meta:
+                    raw_val = row.get(col)
+                    if pd.notna(raw_val):
+                        val_str = str(raw_val).strip()
+                        if val_str:
+                            metafields.append({
+                                "namespace": namespace,
+                                "key": key,
+                                "value": val_str,
+                                "type": value_type,
+                            })
+                if metafields:
+                    input_data["metafields"] = metafields
 
             # Must have at least one field besides "id"
             if len(input_data) <= 1:
@@ -135,7 +170,7 @@ def run_bulk_mutation(resource_url: str) -> dict | None:
     mutation = """
     mutation BulkUpdateTypeAndTags($stagedUploadPath: String!) {
       bulkOperationRunMutation(
-        mutation: "mutation updateTypeAndTags($input: ProductInput!) { productUpdate(input: $input) { product { id productType tags } userErrors { field message } } }",
+        mutation: "mutation updateTypeAndTags($input: ProductInput!) { productUpdate(input: $input) { product { id productType tags metafields(first: 10) { edges { node { namespace key value } } } } userErrors { field message } } }",
         stagedUploadPath: $stagedUploadPath
       ) {
         bulkOperation { id status }
@@ -180,7 +215,8 @@ def main():
     )
     parser.add_argument(
         "--csv", required=True,
-        help="CSV or Excel file with columns: 'Product GID', 'Type', 'Tags'"
+        help=("CSV or Excel file with columns: 'Product GID', 'Type', 'Tags', "
+              "'custom.part_type', 'custom.power_type'")
     )
     parser.add_argument(
         "--dry-run", action="store_true",
