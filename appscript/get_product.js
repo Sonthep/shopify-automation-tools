@@ -11,6 +11,7 @@ const POLL_INTERVAL_MS = 10000; // เช็คสถานะทุกๆ 10 �
 // Keys สำหรับเก็บ Token ลง Properties
 const PROP_ACCESS_TOKEN = "ACCESS_TOKEN";
 const PROP_TOKEN_EXPIRY = "TOKEN_EXPIRY";
+const PROP_LAST_BULK_OP_ID = "LAST_BULK_OP_ID";
 
 // ============================================================
 // UI MENU
@@ -27,18 +28,53 @@ function onOpen() {
 // MAIN FUNCTION
 // ============================================================
 function exportProductsToSheet() {
-  Logger.log("Starting bulk product query...");
+  const props = PropertiesService.getScriptProperties();
+  let opId = props.getProperty(PROP_LAST_BULK_OP_ID);
   
-  const opId = startBulkQuery_();
-  if (!opId) return;
+  if (opId) {
+    Logger.log("Found existing bulk operation: " + opId);
+  } else {
+    // เช็คว่ามี Bulk Query อื่นที่กำลังทำงานบน Shopify หรือไม่
+    Logger.log("Checking current bulk operation status...");
+    const checkQuery = `{ currentBulkOperation(type: QUERY) { id status url } }`;
+    const checkRes = callGraphQL_({ query: checkQuery });
+    const currentOp = (checkRes && checkRes.data) ? checkRes.data.currentBulkOperation : null;
+    
+    if (currentOp && (currentOp.status === "RUNNING" || currentOp.status === "CREATED")) {
+      opId = currentOp.id;
+      props.setProperty(PROP_LAST_BULK_OP_ID, opId);
+      Logger.log("Adopted active bulk operation: " + opId);
+    } else {
+      // เริ่มการสร้าง Bulk Query ใหม่
+      Logger.log("Starting a new bulk query...");
+      opId = startBulkQuery_();
+      if (!opId) {
+        showAlert_("❌ ไม่สามารถเริ่มการดึงข้อมูลได้ โปรดตรวจสอบ Log");
+        return;
+      }
+      props.setProperty(PROP_LAST_BULK_OP_ID, opId);
+      Logger.log("New bulk operation started: " + opId);
+    }
+  }
   
-  Logger.log("Bulk operation started: " + opId);
-  Logger.log("Polling...");
+  // ตรวจสอบสถานะและรอชั่วคราว (สูงสุดประมาณ 45 วินาที) เพื่อไม่ให้ Apps Script เกิน 6 นาที
+  const result = pollStatus_(opId);
   
-  const resultUrl = pollStatus_();
-  if (!resultUrl) return;
-  
-  downloadAndProcessJSONL_(resultUrl);
+  if (result.status === "COMPLETED") {
+    props.deleteProperty(PROP_LAST_BULK_OP_ID);
+    downloadAndProcessJSONL_(result.url);
+    showAlert_("✅ ดึงข้อมูลสินค้าและเขียนลงชีตเรียบร้อยแล้ว!");
+  } else if (result.status === "RUNNING" || result.status === "CREATED") {
+    showAlert_(
+      "⏳ ข้อมูลกำลังจัดเตรียมอยู่บน Shopify...\n\n" +
+      "เนื่องจากข้อมูลมีขนาดใหญ่ ระบบได้สั่งให้จัดเตรียมข้อมูลไว้แล้ว\n" +
+      "กรุณารอ 1-2 นาที แล้วกดเลือกเมนู '1. Export Products to Sheet' อีกครั้งเพื่อทำการดาวน์โหลดลงชีต"
+    );
+  } else {
+    // ล้มเหลวหรือถูกยกเลิก (FAILED, CANCELED, หรือหักล้างข้อมูลไม่พบ)
+    props.deleteProperty(PROP_LAST_BULK_OP_ID);
+    showAlert_("❌ การประมวลผลบน Shopify ล้มเหลว (สถานะ: " + result.status + ")\nระบบได้ล้างคำสั่งเดิมแล้ว โปรดกดรันอีกครั้งเพื่อเริ่มทำรายการใหม่");
+  }
 }
 
 // ============================================================
@@ -47,7 +83,7 @@ function exportProductsToSheet() {
 function startBulkQuery_() {
   const INNER_QUERY = `
 {
-  products {
+  products(query: "metafields.custom.spapart_or_product:สินค้า") {
     edges {
       node {
         id
@@ -74,7 +110,14 @@ function startBulkQuery_() {
             }
           }
         }
-        featuredImage { url }
+        images {
+          edges {
+            node {
+              id
+              url
+            }
+          }
+        }
         metafields {
           edges {
             node {
@@ -122,34 +165,51 @@ mutation BulkQuery($query: String!) {
 // ============================================================
 // 2. POLL STATUS
 // ============================================================
-function pollStatus_() {
-  const POLL_QUERY = `{ currentBulkOperation(type: QUERY) { id status errorCode objectCount url } }`;
-  const payload = { query: POLL_QUERY };
+function pollStatus_(bulkOperationId) {
+  const POLL_QUERY = `
+    query GetBulkOperation($id: ID!) {
+      node(id: $id) {
+        ... on BulkOperation {
+          id
+          status
+          errorCode
+          objectCount
+          url
+        }
+      }
+    }
+  `;
+  const payload = {
+    query: POLL_QUERY,
+    variables: { id: bulkOperationId }
+  };
+  
   const startTime = Date.now();
+  const maxPollTimeMs = 45000; // รอเช็คสถานะสูงสุด 45 วินาทีต่อการกดหนึ่งครั้ง
   
   while (true) {
-    if (Date.now() - startTime > 5 * 60 * 1000) {
-      Logger.log("[ERROR] Polling timed out (5 mins). Please try again later.");
-      return null;
-    }
-    
     const res = callGraphQL_(payload);
-    const op = (res && res.data) ? res.data.currentBulkOperation : null;
+    const op = (res && res.data && res.data.node) ? res.data.node : null;
     
     if (!op) {
-      Logger.log("[ERROR] No active bulk operation.");
-      return null;
+      Logger.log("[ERROR] Bulk operation not found for ID: " + bulkOperationId);
+      return { status: "NOT_FOUND" };
     }
     
     Logger.log(`  [${op.status}] ${op.objectCount} objects`);
     
     if (op.status === "COMPLETED") {
-      return op.url;
+      return { status: "COMPLETED", url: op.url };
     }
     
     if (op.status === "FAILED" || op.status === "CANCELED") {
       Logger.log("[ERROR] Bulk operation failed: " + op.errorCode);
-      return null;
+      return { status: op.status, errorCode: op.errorCode };
+    }
+    
+    if (Date.now() - startTime > maxPollTimeMs) {
+      Logger.log("Polling paused. Still processing: " + op.status);
+      return { status: op.status, objectCount: op.objectCount };
     }
     
     Utilities.sleep(POLL_INTERVAL_MS);
@@ -165,6 +225,7 @@ function downloadAndProcessJSONL_(url) {
   const products = {};
   const variants = {};
   const meta = {};
+  const productImages = {};
   
   let startByte = 0;
   const CHUNK_SIZE = 5 * 1024 * 1024; // โหลดทีละ 5MB ป้องกัน Apps Script ค้าง
@@ -224,6 +285,9 @@ function downloadAndProcessJSONL_(url) {
         } else if (gid.indexOf("/ProductVariant/") !== -1 && parent) {
           if (!variants[parent]) variants[parent] = [];
           variants[parent].push(obj);
+        } else if ((gid.indexOf("/ProductImage/") !== -1 || gid.indexOf("/Image/") !== -1) && parent) {
+          if (!productImages[parent]) productImages[parent] = [];
+          productImages[parent].push(obj.url);
         } else if (obj.namespace && obj.key && parent) {
           if (!meta[parent]) meta[parent] = {};
           meta[parent][`${obj.namespace}.${obj.key}`] = obj.value;
@@ -246,7 +310,7 @@ function downloadAndProcessJSONL_(url) {
     "Variant SKU", "Product GID", "Variant GID", 
     "Inventory Item ID", "Handle", "Title", "Body (HTML)", "Vendor", 
     "Type", "Tags", "Status", "Published", "Price", "Compare At Price", 
-    "Inventory", "Image Src", "SEO Title", "SEO Description", "Category"
+    "Inventory", "Image Src", "Image Preview", "All Images", "SEO Title", "SEO Description", "Category"
   ];
   
   const allRowsData = [];
@@ -266,6 +330,7 @@ function downloadAndProcessJSONL_(url) {
       
       Object.keys(vmf).forEach(k => metaKeysSet.add(k));
       
+      const pImgs = productImages[pid] || [];
       const rowObj = {
         "Variant SKU": v.sku || "",
         "Product GID": pid,
@@ -282,7 +347,8 @@ function downloadAndProcessJSONL_(url) {
         "Price": v.price != null ? v.price : "",
         "Compare At Price": v.compareAtPrice != null ? v.compareAtPrice : "",
         "Inventory": v.inventoryQuantity != null ? v.inventoryQuantity : "",
-        "Image Src": (p.featuredImage && p.featuredImage.url) ? p.featuredImage.url : "",
+        "Image Src": pImgs.length > 0 ? pImgs[0] : "",
+        "All Images": pImgs.join(", "),
         "SEO Title": (p.seo && p.seo.title) ? p.seo.title : "",
         "SEO Description": (p.seo && p.seo.description) ? p.seo.description : "",
         "Category": (p.category && p.category.fullName) ? p.category.fullName : ""
@@ -316,14 +382,22 @@ function downloadAndProcessJSONL_(url) {
   finalHeaders = finalHeaders.concat(metaHeaders);
   
   const finalRows2D = [finalHeaders];
-  allRowsData.forEach(rowObj => {
-    finalRows2D.push(finalHeaders.map(h => rowObj[h] != null ? rowObj[h] : ""));
+  allRowsData.forEach((rowObj, index) => {
+    const rowIndex = index + 2;
+    finalRows2D.push(finalHeaders.map(h => {
+      if (h === "Image Preview") {
+        const imageSrcColIndex = finalHeaders.indexOf("Image Src") + 1;
+        const colLetter = getColumnLetter_(imageSrcColIndex);
+        return `=IMAGE(${colLetter}${rowIndex})`;
+      }
+      return rowObj[h] != null ? rowObj[h] : "";
+    }));
   });
   
   Logger.log(`  ${allRowsData.length} variant rows assembled.`);
   
   // ---------------------------------------------------------
-  // เขียนลง Sheet (แบ่งเขียนทีละ Chunk กันค้าง)
+  // เขียนลง Sheet
   // ---------------------------------------------------------
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(EXPORT_SHEET_NAME);
@@ -333,15 +407,47 @@ function downloadAndProcessJSONL_(url) {
     sheet.clear();
   }
   
-  sheet.getRange(1, 1, 1, finalHeaders.length).setFontWeight("bold");
-  sheet.setFrozenRows(1);
+  const targetRows = finalRows2D.length;
+  const targetCols = finalHeaders.length;
   
-  const CHUNK_SIZE_WRITE = 5000;
-  for (let i = 0; i < finalRows2D.length; i += CHUNK_SIZE_WRITE) {
-    const chunk = finalRows2D.slice(i, i + CHUNK_SIZE_WRITE);
-    sheet.getRange(i + 1, 1, chunk.length, chunk[0].length).setValues(chunk);
-    SpreadsheetApp.flush();
+  const currentRows = sheet.getMaxRows();
+  const currentCols = sheet.getMaxColumns();
+  
+  // ปรับจํานวนคอลัมน์ให้พอดีกับข้อมูล (ลดปริมาณเซลล์ว่างเพื่อความเร็วสูงสุดในการคำนวณ)
+  if (currentCols < targetCols) {
+    sheet.insertColumnsAfter(currentCols, targetCols - currentCols);
+  } else if (currentCols > targetCols) {
+    sheet.deleteColumns(targetCols + 1, currentCols - targetCols);
   }
+  
+  // ปรับจํานวนแถวให้พอดีกับข้อมูล
+  if (currentRows < targetRows) {
+    sheet.insertRowsAfter(currentRows, targetRows - currentRows);
+  } else if (currentRows > targetRows) {
+    sheet.deleteRows(targetRows + 1, currentRows - targetRows);
+  }
+  
+  // 1. ตั้งค่าปิดการตัดข้อความ (Wrap Text) ทั่วทั้งช่วงข้อมูลก่อนเขียนข้อมูล เพื่อความเร็วกว่า และช่วยป้องกันไม่ให้แถวยืดความสูงตาม HTML
+  sheet.getRange(1, 1, targetRows, targetCols).setWrap(false);
+  
+  // 2. ปรับขนาดความสูงแถวข้อมูลทั้งหมดให้พร้อมแสดงรูปภาพ (สูง 100px ยกเว้นหัวข้อที่สูง 25px)
+  sheet.setRowHeight(1, 25);
+  if (targetRows > 1) {
+    sheet.setRowHeightsForced(2, targetRows - 1, 100);
+  }
+  
+  // 3. กำหนดความกว้างคอลัมน์ Image Preview เป็น 100px
+  const imagePreviewColIndex = finalHeaders.indexOf("Image Preview") + 1;
+  if (imagePreviewColIndex > 0) {
+    sheet.setColumnWidth(imagePreviewColIndex, 100);
+  }
+  
+  // 4. เขียนข้อมูลทั้งหมดลงในชีตในคราวเดียว
+  sheet.getRange(1, 1, targetRows, targetCols).setValues(finalRows2D);
+  
+  // 5. จัดรูปแบบหัวตาราง
+  sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
+  sheet.setFrozenRows(1);
   
   Logger.log(`✅ ${allRowsData.length} products exported to sheet '${EXPORT_SHEET_NAME}'`);
 }
@@ -353,7 +459,7 @@ function cleanHtmlInSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(EXPORT_SHEET_NAME);
   if (!sheet) {
-    SpreadsheetApp.getUi().alert("ไม่พบ Sheet: " + EXPORT_SHEET_NAME);
+    showAlert_("ไม่พบ Sheet: " + EXPORT_SHEET_NAME);
     return;
   }
   
@@ -362,7 +468,7 @@ function cleanHtmlInSheet() {
   const colIndex = headers.indexOf("Body (HTML)");
   
   if (colIndex === -1) {
-    SpreadsheetApp.getUi().alert("ไม่พบคอลัมน์ 'Body (HTML)'");
+    showAlert_("ไม่พบคอลัมน์ 'Body (HTML)'");
     return;
   }
   
@@ -382,7 +488,7 @@ function cleanHtmlInSheet() {
   
   // 3. เขียนข้อมูลที่แปลงแล้วกลับลงไป
   range.setValues(values);
-  SpreadsheetApp.getUi().alert("แปลง HTML เป็นข้อความปกติเรียบร้อยแล้ว!");
+  showAlert_("แปลง HTML เป็นข้อความปกติเรียบร้อยแล้ว!");
 }
 
 // ============================================================
@@ -473,4 +579,34 @@ function stripHtml_(html) {
   text = text.replace(/\n\s*\n\s*\n/g, '\n\n');
   
   return text.trim();
+}
+
+// ============================================================
+// HELPER: แปลงเลขคอลัมน์เป็นตัวอักษร (เช่น 1 -> A, 27 -> AA)
+// ============================================================
+function getColumnLetter_(colNum) {
+  let letter = "";
+  let temp;
+  while (colNum > 0) {
+    temp = (colNum - 1) % 26;
+    letter = String.fromCharCode(65 + temp) + letter;
+    colNum = (colNum - temp - 1) / 26;
+  }
+  return letter;
+}
+
+// ============================================================
+// HELPER: แสดง Alert อย่างปลอดภัย แม้ไม่ได้รันจากหน้าต่างชีตโดยตรง (เช่น รันผ่าน Editor)
+// ============================================================
+function showAlert_(message) {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    if (ui) {
+      ui.alert(message);
+      return;
+    }
+  } catch (e) {
+    // UI ไม่สามารถเรียกใช้ได้ในบริบทนี้ (เช่น รันจาก Editor หรือ Trigger)
+  }
+  Logger.log("ALERT: " + message);
 }
