@@ -12,7 +12,7 @@ Output CSV format:
 
 การใช้งาน (Usage):
   python export_folders_to_csv.py
-  python export_folders_to_csv.py --folder "W:\\path\\to\\main" --out "subfolders.csv"
+  python export_folders_to_csv.py --folder "W:\\path\\to\\main" --out "subfolder_list.csv"
 -------------------------------------------------------------------------------
 """
 

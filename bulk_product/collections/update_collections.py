@@ -44,6 +44,7 @@ COL_HANDLE    = "Handle"
 COL_PAGE      = "Page Title"
 COL_META      = "Meta Description"
 COL_CONDITION = "Condition"
+COL_PUBLISHING = "Publishing"
 
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 
@@ -247,19 +248,127 @@ def poll_status(interval: int = 10) -> str | None:
         time.sleep(interval)
 
 
+# ── Step 5: Update Publishing Status ──────────────────────────
+
+def update_publishing(df: pd.DataFrame, dry_run: bool):
+    if COL_PUBLISHING not in df.columns:
+        return
+
+    # Check if there's at least one non-empty value in Publishing
+    has_publishing_updates = False
+    for _, row in df.iterrows():
+        if get_val(row, COL_PUBLISHING) is not None:
+            has_publishing_updates = True
+            break
+
+    if not has_publishing_updates:
+        return
+
+    print("\n── 4. Updating Publishing channels ──")
+    
+    # Query all publications to map names to GIDs
+    pub_query = """
+    {
+      publications(first: 50) {
+        edges {
+          node {
+            id
+            name
+          }
+        }
+      }
+    }
+    """
+    res_pub = gql(API_URL, HEADERS, pub_query)
+    publications = []
+    if res_pub and "data" in res_pub:
+        edges = res_pub["data"].get("publications", {}).get("edges", [])
+        publications = [edge["node"] for edge in edges if "node" in edge]
+    
+    name_to_gid = {pub["name"].strip().lower(): pub["id"] for pub in publications}
+    if not name_to_gid:
+        print("  [WARN] No publications found in this shop.")
+        return
+
+    pub_mut = """
+    mutation publishablePublish($id: ID!, $input: [PublicationInput!]!) {
+      publishablePublish(id: $id, input: $input) {
+        userErrors { field message }
+      }
+    }
+    """
+
+    unpub_mut = """
+    mutation publishableUnpublish($id: ID!, $input: [PublicationInput!]!) {
+      publishableUnpublish(id: $id, input: $input) {
+        userErrors { field message }
+      }
+    }
+    """
+
+    for _, row in df.iterrows():
+        gid = get_val(row, COL_GID)
+        if not gid:
+            continue
+        
+        pub_val = get_val(row, COL_PUBLISHING)
+        if pub_val is None:
+            continue # skip if blank (keep existing publishing)
+            
+        # Parse targets
+        target_names = []
+        if pub_val.strip().lower() != "none":
+            target_names = [n.strip().lower() for n in pub_val.split(",") if n.strip()]
+        
+        to_publish_inputs = []
+        to_unpublish_inputs = []
+        
+        for name, pub_id in name_to_gid.items():
+            if name in target_names:
+                to_publish_inputs.append({"publicationId": pub_id})
+            else:
+                to_unpublish_inputs.append({"publicationId": pub_id})
+                
+        col_title = get_val(row, COL_TITLE) or gid
+        
+        if dry_run:
+            pub_names_str = ", ".join([pub["name"] for pub in publications if pub["id"] in [x["publicationId"] for x in to_publish_inputs]]) or "None"
+            unpub_names_str = ", ".join([pub["name"] for pub in publications if pub["id"] in [x["publicationId"] for x in to_unpublish_inputs]]) or "None"
+            print(f"  [DRY RUN] {col_title}:")
+            print(f"    Publish to  : {pub_names_str}")
+            print(f"    Unpublish from: {unpub_names_str}")
+            continue
+
+        # Run publish
+        if to_publish_inputs:
+            res = gql(API_URL, HEADERS, pub_mut, {"id": gid, "input": to_publish_inputs})
+            errs = (res or {}).get("data", {}).get("publishablePublish", {}).get("userErrors", [])
+            if errs:
+                print(f"  [ERR] {col_title} publish errors: {errs}")
+                
+        # Run unpublish
+        if to_unpublish_inputs:
+            res = gql(API_URL, HEADERS, unpub_mut, {"id": gid, "input": to_unpublish_inputs})
+            errs = (res or {}).get("data", {}).get("publishableUnpublish", {}).get("userErrors", [])
+            if errs:
+                print(f"  [ERR] {col_title} unpublish errors: {errs}")
+                
+        print(f"  [OK] Updated publishing for: {col_title}")
+
+
 # ── Main ──────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Bulk update Shopify collections (title, handle, SEO, rules) via Bulk Operation API"
+        description="Bulk update Shopify collections (title, handle, SEO, rules, publishing) via Bulk Operation API"
     )
     parser.add_argument(
         "--csv", required=True,
-        help="CSV or Excel file with 'Collection GID' + optional: Title, Handle, Page Title, Meta Description, Condition",
+        help="CSV or Excel file with 'Collection GID' + optional: Title, Handle, Page Title, Meta Description, Condition, Publishing",
     )
     parser.add_argument(
         "--dry-run", action="store_true",
-        help="Build JSONL only — do not upload or run mutation",
+        help="Dry run: Build JSONL and preview publishing updates without applying changes",
     )
     args = parser.parse_args()
 
@@ -276,27 +385,30 @@ def main():
     out_jsonl = os.path.join(OUTPUT_DIR, "collections_update.jsonl")
     count = build_jsonl(df, out_jsonl)
 
-    if args.dry_run:
-        print("[DRY RUN] JSONL built — no changes sent to Shopify.")
-        return
-    if count == 0:
-        print("[INFO] Nothing to update.")
-        return
+    # 1. Run bulk metadata updates if any fields are present
+    if count > 0:
+        if args.dry_run:
+            print("[DRY RUN] JSONL built — no metadata changes sent to Shopify.")
+        else:
+            print("\n── 1. Uploading JSONL ──")
+            target = create_staged_upload("collections_update.jsonl")
+            if not target:
+                sys.exit(1)
+            res_url = upload_jsonl(target, out_jsonl)
 
-    print("\n── 1. Uploading JSONL ──")
-    target = create_staged_upload("collections_update.jsonl")
-    if not target:
-        sys.exit(1)
-    res_url = upload_jsonl(target, out_jsonl)
+            print("\n── 2. Running bulk mutation ──")
+            op = run_bulk_mutation(res_url)
+            if not op:
+                sys.exit(1)
 
-    print("\n── 2. Running bulk mutation ──")
-    op = run_bulk_mutation(res_url)
-    if not op:
-        sys.exit(1)
+            print("\n── 3. Polling status ──")
+            result_url = poll_status()
+            print(f"\n✅ Done!  Result URL: {result_url}")
+    else:
+        print("[INFO] No metadata updates (Title, Handle, SEO, rules) detected.")
 
-    print("\n── 3. Polling status ──")
-    result_url = poll_status()
-    print(f"\n✅ Done!  Result URL: {result_url}")
+    # 2. Run publishing updates (normal API calls)
+    update_publishing(df, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

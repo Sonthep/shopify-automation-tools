@@ -1,4 +1,4 @@
-﻿"""
+"""
 Bulk-update metafield values on products from a CSV file.
 
 CSV format:
@@ -97,14 +97,18 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> int:
     df = read_csv_auto(csv_file, dtype=str)
     print(f"Columns: {df.columns.tolist()}")
 
-    if GID_COL not in df.columns:
-        print(f"❌ Column '{GID_COL}' not found.")
-        return 0
+    gid_col = GID_COL
+    if gid_col not in df.columns:
+        if "Product GID" in df.columns:
+            gid_col = "Product GID"
+        else:
+            print(f"❌ Column '{GID_COL}' or 'Product GID' not found.")
+            return 0
 
     has_desc  = DESC_COL in df.columns
 
     # Parse metafield columns (must be "namespace.key" format)
-    skip_cols = {GID_COL, DESC_COL}
+    skip_cols = {gid_col, DESC_COL}
     meta_cols = [c for c in df.columns if c not in skip_cols and "." in c]
     if not meta_cols and not has_desc:
         print("❌ No updatable columns found. Add 'descriptionHtml' and/or metafield columns named 'namespace.key'")
@@ -132,7 +136,7 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> int:
             print(f"  ⚠️  Definition not found for '{col}' — using single_line_text_field")
         col_info.append((col, ns, key, mf_type))
 
-    df = df.dropna(subset=[GID_COL])
+    df = df.dropna(subset=[gid_col])
     print(f"\n📋 {len(df)} rows to process")
 
     os.makedirs(os.path.dirname(jsonl_file), exist_ok=True)
@@ -140,7 +144,7 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> int:
 
     with open(jsonl_file, "w", encoding="utf-8") as f:
         for _, row in df.iterrows():
-            gid = str(row[GID_COL]).strip()
+            gid = str(row[gid_col]).strip()
             if not gid:
                 continue
 

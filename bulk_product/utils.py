@@ -28,6 +28,16 @@ def make_headers(token_env: str) -> dict:
     """Build Shopify API headers from a named env var."""
     token = os.getenv(token_env)
     if not token:
+        try:
+            root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            if root_dir not in sys.path:
+                sys.path.insert(0, root_dir)
+            from gen_token import generate_token
+            token = generate_token(_ENV_FILE)
+        except Exception as e:
+            print(f"⚠️ Could not auto-generate token: {e}")
+            
+    if not token:
         raise RuntimeError(f"Environment variable '{token_env}' is not set.")
     print(f"SHOP : {SHOP}")
     print(f"TOKEN: {token[:10]}...")
@@ -39,12 +49,26 @@ def make_headers(token_env: str) -> dict:
 
 def gql(api_url: str, headers: dict, query: str, variables: dict = None) -> dict | None:
     """Execute a GraphQL query/mutation. Returns body dict or None on error.
-    Automatically retries on THROTTLED errors with exponential backoff.
+    Automatically retries on THROTTLED errors with exponential backoff,
+    and automatically refreshes token on 401 Unauthorized.
     """
     max_retries = 6
     wait = 2.0
     for attempt in range(max_retries):
         res = requests.post(api_url, json={"query": query, "variables": variables or {}}, headers=headers)
+        if res.status_code == 401:
+            print(f"  [WARN] HTTP 401 Unauthorized -- token expired. Auto refreshing token (attempt {attempt + 1}/{max_retries})...")
+            try:
+                root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+                if root_dir not in sys.path:
+                    sys.path.insert(0, root_dir)
+                from gen_token import generate_token
+                new_token = generate_token(_ENV_FILE)
+                if new_token:
+                    headers["X-Shopify-Access-Token"] = new_token
+                    continue
+            except Exception as e:
+                print(f"  [ERR] Failed to auto refresh token: {e}")
         try:
             body = res.json()
         except ValueError:
@@ -64,7 +88,7 @@ def gql(api_url: str, headers: dict, query: str, variables: dict = None) -> dict
             print(f"  [ERR] GraphQL errors: {errors}")
             return None
         return body
-    print(f"  [ERR] Gave up after {max_retries} retries (throttle)")
+    print(f"  [ERR] Gave up after {max_retries} retries")
     return None
 
 

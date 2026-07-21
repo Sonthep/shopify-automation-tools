@@ -30,6 +30,24 @@ from utils import make_headers, gql, API_URL
 HEADERS  = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 BASE_DIR = os.path.dirname(__file__)
 
+QUERY_THAI_TRANSLATION = """
+query getCollectionTranslations($resourceId: ID!) {
+  translatableResource(resourceId: $resourceId) {
+    translations(locale: "th") {
+      key
+      value
+    }
+  }
+}
+"""
+
+
+def fetch_thai_translations(resource_id: str) -> dict[str, str]:
+    """Fetch existing Thai translations (title, body_html, meta_title, meta_description) for a collection."""
+    res = gql(API_URL, HEADERS, QUERY_THAI_TRANSLATION, {"resourceId": resource_id})
+    translations = (res or {}).get("data", {}).get("translatableResource", {}).get("translations", [])
+    return {t.get("key"): t.get("value") for t in translations if t.get("key") and t.get("value")}
+
 # ── Step 1: Start bulk query ──────────────────────────────────
 
 INNER_QUERY = """
@@ -50,6 +68,17 @@ INNER_QUERY = """
             column
             relation
             condition
+          }
+        }
+        resourcePublicationsV2(first: 10) {
+          edges {
+            node {
+              isPublished
+              publication {
+                id
+                name
+              }
+            }
           }
         }
       }
@@ -128,13 +157,25 @@ def download_jsonl(url: str) -> list[dict]:
 
 # ── Step 5: Parse rows → DataFrame ───────────────────────────
 
-def parse_rows(rows: list[dict]) -> pd.DataFrame:
-    records = []
-    for obj in rows:
-        # Bulk query returns one JSON object per collection node
-        if "__parentId" in obj:
-            continue  # skip child edges (Shopify bulk flattens nested edges)
+def parse_rows(rows: list[dict], fetch_trans: bool = False) -> pd.DataFrame:
+    collection_pubs = {}
+    collections = []
 
+    for obj in rows:
+        if "__parentId" in obj:
+            parent_id = obj["__parentId"]
+            if "publication" in obj and obj.get("isPublished") is True:
+                pub_name = obj["publication"].get("name")
+                if pub_name:
+                    if parent_id not in collection_pubs:
+                        collection_pubs[parent_id] = []
+                    collection_pubs[parent_id].append(pub_name)
+        else:
+            collections.append(obj)
+
+    records = []
+    total_col = len(collections)
+    for idx, obj in enumerate(collections, start=1):
         col_id    = obj.get("id", "")
         title     = obj.get("title", "")
         handle    = obj.get("handle", "")
@@ -158,7 +199,10 @@ def parse_rows(rows: list[dict]) -> pd.DataFrame:
             col_type  = "CUSTOM"
             condition = ""
 
-        records.append({
+        pubs = collection_pubs.get(col_id, [])
+        pubs_str = ", ".join(sorted(pubs))
+
+        rec = {
             "Collection GID":   col_id,
             "Title":            title,
             "Handle":           handle,
@@ -166,9 +210,20 @@ def parse_rows(rows: list[dict]) -> pd.DataFrame:
             "Meta Description": meta_desc,
             "Type":             col_type,
             "Condition":        condition,
-        })
+            "Publishing":       pubs_str,
+        }
 
-    df = pd.DataFrame(records, columns=[
+        if fetch_trans and col_id:
+            print(f"  [{idx}/{total_col}] Fetching Thai translations for {title}...")
+            trans_map = fetch_thai_translations(col_id)
+            rec["Title TH"]            = trans_map.get("title", "")
+            rec["Description TH"]      = trans_map.get("body_html", "")
+            rec["Meta title th"]       = trans_map.get("meta_title", "")
+            rec["Meta description th"] = trans_map.get("meta_description", "")
+
+        records.append(rec)
+
+    cols = [
         "Collection GID",
         "Title",
         "Handle",
@@ -176,14 +231,21 @@ def parse_rows(rows: list[dict]) -> pd.DataFrame:
         "Meta Description",
         "Type",
         "Condition",
-    ])
+        "Publishing",
+    ]
+    if fetch_trans:
+        cols.extend(["Title TH", "Description TH", "Meta title th", "Meta description th"])
+
+    df = pd.DataFrame(records, columns=cols)
     return df
 
 
 # ── Step 6: Save Excel ────────────────────────────────────────
 
 def save_excel(df: pd.DataFrame, out_path: str):
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    out_dir = os.path.dirname(out_path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Collections")
 
@@ -210,6 +272,11 @@ def main():
         default=os.path.join(BASE_DIR, "output", "collections_export.xlsx"),
         help="Output Excel file path (default: collections/output/collections_export.xlsx)",
     )
+    parser.add_argument(
+        "--fetch-translations",
+        action="store_true",
+        help="Fetch existing Thai translations (Title TH, Description TH, Meta title th, Meta description th)",
+    )
     args = parser.parse_args()
 
     print("\n── 1. Starting bulk query ──")
@@ -226,7 +293,7 @@ def main():
     rows = download_jsonl(result_url)
 
     print("\n── 4. Parsing data ──")
-    df = parse_rows(rows)
+    df = parse_rows(rows, fetch_trans=args.fetch_translations)
     print(f"  {len(df)} collections parsed")
     print(f"  Types: {df['Type'].value_counts().to_dict()}")
 

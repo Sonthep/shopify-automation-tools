@@ -5,6 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "gen-token": "python gen_token.py",
     "get-menus": "node scripts/get-menus.mjs",
     "menus-to-csv": "node scripts/menus-to-csv.mjs",
     "update-inventory": "node scripts/update_inventory_auto.js",
