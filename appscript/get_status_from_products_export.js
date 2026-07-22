@@ -128,7 +128,7 @@ function processStatusFilter_(targetStatusMode, targetSheetName) {
     } else {
       totalSkipped++;
     }
-  });
+  }
   
   Logger.log(`📊 ประมวลผลเสร็จสิ้น! พบสินค้าสถานะ [${targetStatusMode}]: ${totalMatch} รายการ (ข้าม ${totalSkipped} รายการ)`);
   
