@@ -20,6 +20,8 @@ function onOpen() {
   ui.createMenu('📦 Product Status Tools')
     .addItem('1. ดึงเฉพาะสินค้าสถานะ Active จาก Shopify', 'getStatusFromProductsExport')
     .addItem('2. ดึงเฉพาะสินค้าสถานะ Inactive จาก Shopify', 'getInactiveStatusFromProductsExport')
+    .addSeparator()
+    .addItem('⚡ 3. อัปเดตสินค้าบน Shopify เป็น DRAFT (ถ้า status winspeed = I)', 'updateStatusDraftFromWinspeed')
     .addToUi();
 }
 
@@ -28,17 +30,89 @@ function onOpen() {
 // ============================================================
 
 /**
- * ดึงเฉพาะสินค้าสถานะ ACTIVE จาก Shopify ลงหน้า "Active Products" (พร้อมสูตร status winspeed)
+ * 1. ดึงเฉพาะสินค้าสถานะ ACTIVE จาก Shopify ลงหน้า "Active Products" (พร้อมสูตร status winspeed)
  */
 function getStatusFromProductsExport() {
   fetchProductsDirectFromShopify_("status:ACTIVE", STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME || "Active Products");
 }
 
 /**
- * ดึงเฉพาะสินค้าสถานะ INACTIVE จาก Shopify ลงหน้า "Inactive" (พร้อมสูตร status winspeed)
+ * 2. ดึงเฉพาะสินค้าสถานะ INACTIVE จาก Shopify ลงหน้า "Inactive" (พร้อมสูตร status winspeed)
  */
 function getInactiveStatusFromProductsExport() {
   fetchProductsDirectFromShopify_("status:DRAFT OR status:ARCHIVED", "Inactive");
+}
+
+/**
+ * 3. อัปเดตสินค้าบน Shopify เป็น DRAFT ถ้าคอลัมน์ status winspeed (Col F) = 'I'
+ */
+function updateStatusDraftFromWinspeed() {
+  Logger.log("=== เริ่มอัปเดตสถานะสินค้าบน Shopify เป็น DRAFT (ถ้า status winspeed = I) ===");
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME || "Active Products");
+  
+  if (!sheet) {
+    const errMsg = "❌ ไม่พบ Sheet " + (STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME || "Active Products");
+    Logger.log(errMsg);
+    writeStatusLog_("Update DRAFT", 0, 0, 0, errMsg);
+    return;
+  }
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    const errMsg = "⚠️ ไม่พบข้อมูลใน Sheet " + sheet.getName();
+    Logger.log(errMsg);
+    writeStatusLog_("Update DRAFT", 0, 0, 0, errMsg);
+    return;
+  }
+  
+  // อ่านข้อมูลคอลัมน์ C (Product GID) และ คอลัมน์ F (status winspeed)
+  const productGidData = sheet.getRange(2, 3, lastRow - 1, 1).getValues();
+  const winspeedData = sheet.getRange(2, 6, lastRow - 1, 1).getValues();
+  
+  const productGidsToDraft = new Set();
+  
+  for (let i = 0; i < winspeedData.length; i++) {
+    const winspeedStatus = String(winspeedData[i][0] || "").trim().toUpperCase();
+    const productGid = String(productGidData[i][0] || "").trim();
+    
+    if (winspeedStatus === "I" && productGid && productGid.indexOf("gid://shopify/Product/") === 0) {
+      productGidsToDraft.add(productGid);
+    }
+  }
+  
+  const targetGids = Array.from(productGidsToDraft);
+  if (targetGids.length === 0) {
+    const msg = "⚠️ ไม่พบรายการสินค้าที่มี status winspeed = 'I'";
+    Logger.log(msg);
+    writeStatusLog_("Update DRAFT", 0, 0, 0, msg);
+    return;
+  }
+  
+  Logger.log(`📌 พบสินค้าที่ต้องปรับสถานะเป็น DRAFT ทั้งหมด ${targetGids.length} รายการ (Unique Product GID)`);
+  
+  // ใช้ Shopify Bulk Mutation API อัปเดตรวดเดียวใน 3-5 วินาที
+  const jsonlLines = targetGids.map(gid => JSON.stringify({
+    input: {
+      id: gid,
+      status: "DRAFT"
+    }
+  }));
+  
+  const bulkResult = runShopifyBulkMutation_(
+    jsonlLines,
+    "mutationCall: \"productUpdate(input: $input)\""
+  );
+  
+  if (bulkResult && bulkResult.success) {
+    const successMsg = `⚡ [SUCCESS] อัปเดตสินค้าสถานะเป็น DRAFT บน Shopify สำเร็จ ${targetGids.length} รายการ (เนื่องจาก status winspeed = 'I')`;
+    Logger.log(successMsg);
+    writeStatusLog_("Update DRAFT", targetGids.length, targetGids.length, 0, successMsg);
+  } else {
+    const failMsg = `❌ อัปเดตสินค้าเป็น DRAFT ล้มเหลว: ` + (bulkResult ? bulkResult.error : "Unknown error");
+    Logger.log(failMsg);
+    writeStatusLog_("Update DRAFT", targetGids.length, 0, targetGids.length, failMsg);
+  }
 }
 
 // ============================================================
@@ -212,6 +286,94 @@ function fetchProductsDirectFromShopify_(statusQuery, targetSheetName) {
   const successMsg = `✅ ดึงข้อมูลสินค้าสถานะ ${statusQuery} จาก Shopify สำเร็จ ${rows.length - 1} แถว พร้อมสูตร status winspeed ลงใน Sheet "${targetSheetName}"`;
   Logger.log(successMsg);
   writeStatusLog_(targetSheetName, rows.length - 1, rows.length - 1, 0, successMsg);
+}
+
+// ============================================================
+// SHOPIFY BULK MUTATION RUNNER (stagedUploadsCreate + bulkOperationRunMutation)
+// ============================================================
+
+function runShopifyBulkMutation_(jsonlLines, mutationCallSignature) {
+  const jsonlData = jsonlLines.join("\n");
+  
+  const stageMutation = `mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
+    stagedUploadsCreate(input: $input) {
+      stagedTargets { url resourceUrl parameters { name value } }
+      userErrors { field message }
+    }
+  }`;
+
+  const stageVars = {
+    input: [{
+      resource: "BULK_MUTATION_VARIABLES",
+      filename: "bulk_status_update.jsonl",
+      mimeType: "text/jsonl",
+      httpMethod: "POST"
+    }]
+  };
+
+  const stageRes = callGraphQL_({ query: stageMutation, variables: stageVars });
+  if (!stageRes || !stageRes.data || !stageRes.data.stagedUploadsCreate) {
+    return { success: false, error: "stagedUploadsCreate failed" };
+  }
+
+  const target = stageRes.data.stagedUploadsCreate.stagedTargets[0];
+  const uploadUrl = target.url;
+  const keyParam = target.parameters.find(p => p.name === "key");
+  if (!keyParam) return { success: false, error: "Key param missing in stagedUploadsCreate" };
+  const stagedPath = keyParam.value;
+
+  // Upload JSONL Payload to Shopify S3 Staging
+  const payloadParts = {};
+  target.parameters.forEach(p => { payloadParts[p.name] = p.value; });
+  payloadParts["file"] = Utilities.newBlob(jsonlData, "text/jsonl", "bulk_status_update.jsonl");
+
+  const uploadOptions = { method: "post", payload: payloadParts, muteHttpExceptions: true };
+  const uploadRes = UrlFetchApp.fetch(uploadUrl, uploadOptions);
+  if (uploadRes.getResponseCode() >= 400) {
+    return { success: false, error: "Upload payload to S3 failed: " + uploadRes.getContentText() };
+  }
+
+  // Trigger Bulk Mutation Operation
+  const runMutation = `mutation bulkOperationRunMutation($mutation: String!, $stagedUploadPath: String!) {
+    bulkOperationRunMutation(mutation: $mutation, stagedUploadPath: $stagedUploadPath) {
+      bulkOperation { id status }
+      userErrors { field message }
+    }
+  }`;
+
+  const runVars = {
+    mutation: `${mutationCallSignature} { product { id status } userErrors { field message } }`,
+    stagedUploadPath: stagedPath
+  };
+
+  const runRes = callGraphQL_({ query: runMutation, variables: runVars });
+  if (!runRes || !runRes.data || !runRes.data.bulkOperationRunMutation) {
+    return { success: false, error: "bulkOperationRunMutation failed" };
+  }
+
+  const userErrors = runRes.data.bulkOperationRunMutation.userErrors || [];
+  if (userErrors.length > 0) {
+    return { success: false, error: JSON.stringify(userErrors) };
+  }
+
+  const opId = runRes.data.bulkOperationRunMutation.bulkOperation.id;
+  Logger.log("🚀 Bulk Mutation Started: " + opId);
+
+  // Poll for completion
+  const pollQuery = `{ currentBulkOperation { id status errorCode objectCount fileSize } }`;
+  let attempts = 0;
+  while (attempts < 60) {
+    Utilities.sleep(2000);
+    attempts++;
+    const pollRes = callGraphQL_({ query: pollQuery });
+    const op = pollRes ? pollRes.data.currentBulkOperation : null;
+    if (op) {
+      Logger.log(`  [Poll ${attempts}] Status: ${op.status} | Processed: ${op.objectCount || 0}`);
+      if (op.status === "COMPLETED") return { success: true, count: op.objectCount };
+      if (op.status === "FAILED" || op.status === "CANCELED") return { success: false, error: op.errorCode };
+    }
+  }
+  return { success: false, error: "Timeout waiting for bulk mutation completion" };
 }
 
 // ============================================================
