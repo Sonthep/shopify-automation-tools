@@ -6,6 +6,7 @@ var STATUS_EXPORT_CONFIG = {
   CLIENT_ID: "xxxxxxxxxxxxxxxxxxx",
   CLIENT_SECRET: "xxxxxxxxxxxxxxxxxxx",
   TARGET_SHEET_NAME: "Active Products",
+  WINSPEED_SPREADSHEET_ID: "1-7ap--3aphttTb8M0cXYvVYmRGtZQKRxoUW3nvwuUNA",
   LOG_SHEET_NAME: "Log run script",
   PROP_ACCESS_TOKEN: "ACCESS_TOKEN",
   PROP_TOKEN_EXPIRY: "TOKEN_EXPIRY"
@@ -27,14 +28,14 @@ function onOpen() {
 // ============================================================
 
 /**
- * ดึงเฉพาะสินค้าสถานะ ACTIVE จาก Shopify ลงหน้า "Active Products" (เร็วที่สุด 3-5 วินาที)
+ * ดึงเฉพาะสินค้าสถานะ ACTIVE จาก Shopify ลงหน้า "Active Products" (พร้อมสูตร status winspeed)
  */
 function getStatusFromProductsExport() {
   fetchProductsDirectFromShopify_("status:ACTIVE", STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME || "Active Products");
 }
 
 /**
- * ดึงเฉพาะสินค้าสถานะ INACTIVE จาก Shopify ลงหน้า "Inactive" (เร็วที่สุด 3-5 วินาที)
+ * ดึงเฉพาะสินค้าสถานะ INACTIVE จาก Shopify ลงหน้า "Inactive" (พร้อมสูตร status winspeed)
  */
 function getInactiveStatusFromProductsExport() {
   fetchProductsDirectFromShopify_("status:DRAFT OR status:ARCHIVED", "Inactive");
@@ -132,14 +133,13 @@ function fetchProductsDirectFromShopify_(statusQuery, targetSheetName) {
     return;
   }
   
-  // 4. ดาวน์โหลดและจัดโครงสร้างข้อมูล 5 คอลัมน์ตามที่ระบุ
-  // custom.good_id, Variant SKU, Product GID, Variant GID, status
+  // 4. ดาวน์โหลดและจัดโครงสร้างข้อมูล 6 คอลัมน์ (รวม status winspeed)
   const fileRes = UrlFetchApp.fetch(downloadUrl);
   const jsonlContent = fileRes.getContentText();
   const lines = jsonlContent.split("\n");
   
   const productMap = {}; // product_id -> { good_id, status }
-  const targetHeaders = ["custom.good_id", "Variant SKU", "Product GID", "Variant GID", "status"];
+  const targetHeaders = ["custom.good_id", "Variant SKU", "Product GID", "Variant GID", "status", "status winspeed"];
   const rows = [targetHeaders];
   
   // Parse Product (แม่)
@@ -166,7 +166,8 @@ function fetchProductsDirectFromShopify_(statusQuery, targetSheetName) {
           obj.sku || "",
           obj.__parentId,
           obj.id,
-          parent.status || "ACTIVE"
+          parent.status || "ACTIVE",
+          "" // เว้นไว้สำหรับใส่สูตร status winspeed
         ]);
       }
     } catch (e) {}
@@ -198,10 +199,17 @@ function fetchProductsDirectFromShopify_(statusQuery, targetSheetName) {
     targetSheet.getRange(i + 1, 1, chunk.length, numCols).setValues(chunk);
   }
   
+  // 6. ใส่สูตร "status winspeed" ในคอลัมน์ F (คอลัมน์ที่ 6) สำหรับทุกบรรทัดข้อมูล
+  if (numRows > 1) {
+    const winspeedFormula = `=IFERROR(VLOOKUP(A2, IMPORTRANGE("${STATUS_EXPORT_CONFIG.WINSPEED_SPREADSHEET_ID}","Inactive!B:F"), 5, FALSE), "")`;
+    targetSheet.getRange(2, 6, numRows - 1, 1).setFormula(winspeedFormula);
+    Logger.log(`📌 ใส่สูตร "status winspeed" ในคอลัมน์ F เรียบร้อยแล้ว (${numRows - 1} แถว)`);
+  }
+  
   targetSheet.getRange(1, 1, 1, numCols).setFontWeight("bold");
   targetSheet.setFrozenRows(1);
   
-  const successMsg = `✅ ดึงข้อมูลสินค้าสถานะ ${statusQuery} จาก Shopify สำเร็จ ${rows.length - 1} แถว ลงใน Sheet "${targetSheetName}"`;
+  const successMsg = `✅ ดึงข้อมูลสินค้าสถานะ ${statusQuery} จาก Shopify สำเร็จ ${rows.length - 1} แถว พร้อมสูตร status winspeed ลงใน Sheet "${targetSheetName}"`;
   Logger.log(successMsg);
   writeStatusLog_(targetSheetName, rows.length - 1, rows.length - 1, 0, successMsg);
 }
