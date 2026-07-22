@@ -5,8 +5,6 @@ var STATUS_EXPORT_CONFIG = {
   SHOP: "sevenfive-4062.myshopify.com",
   CLIENT_ID: "xxxxxxxxxxxxxxxxxxx",
   CLIENT_SECRET: "xxxxxxxxxxxxxxxxxxx",
-  SOURCE_SPREADSHEET_ID: "1hfHjhC7WdjVDT7qHt19PL8AnxlhTJ6rbbh-N4UBQJBA",
-  SOURCE_SHEET_NAME: "Products Export",
   TARGET_SHEET_NAME: "Active Products",
   LOG_SHEET_NAME: "Log run script",
   PROP_ACCESS_TOKEN: "ACCESS_TOKEN",
@@ -19,48 +17,35 @@ var STATUS_EXPORT_CONFIG = {
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('📦 Product Status Tools')
-    .addItem('⚡ 1. [ULTRA FAST] ดึงสินค้า Active ทั้งหมด (Bulk Operation - 3-5 วินาที)', 'fetchActiveProductsBulkMutation')
-    .addItem('⚡ 2. [ULTRA FAST] ดึงสินค้า Inactive ทั้งหมด (Bulk Operation - 3-5 วินาที)', 'fetchInactiveProductsBulkMutation')
-    .addSeparator()
-    .addItem('3. ดึงสินค้า Active ทั้งหมด (แบบ Paginated GraphQL - 15 วินาที)', 'fetchAllActiveProductsFull')
-    .addItem('4. ดึงสินค้า Active ทั้งหมด (สูตร QUERY IMPORTRANGE - 1 วินาที)', 'getActiveProductsViaQuery')
-    .addSeparator()
-    .addItem('5. แปลงสูตรใน Sheet ปัจจุบันเป็นข้อความปกติ (Freeze Values)', 'convertFormulasToValues')
+    .addItem('1. ดึงเฉพาะสินค้าสถานะ Active จาก Shopify', 'getStatusFromProductsExport')
+    .addItem('2. ดึงเฉพาะสินค้าสถานะ Inactive จาก Shopify', 'getInactiveStatusFromProductsExport')
     .addToUi();
 }
 
 // ============================================================
-// MAIN ENTRY POINTS
+// MAIN FUNCTIONS
 // ============================================================
 
 /**
- * ฟังก์ชั่นหลัก: ดึงสินค้าสถานะ ACTIVE ทั้งหมดเร็วที่สุดในโลก (3-5 วินาที)
+ * ดึงเฉพาะสินค้าสถานะ ACTIVE จาก Shopify ลงหน้า "Active Products" (เร็วที่สุด 3-5 วินาที)
  */
 function getStatusFromProductsExport() {
-  fetchActiveProductsBulkMutation();
+  fetchProductsDirectFromShopify_("status:ACTIVE", STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME || "Active Products");
 }
 
 /**
- * ฟังก์ชั่นหลัก: ดึงสินค้าสถานะ INACTIVE ทั้งหมดเร็วที่สุดในโลก (3-5 วินาที)
+ * ดึงเฉพาะสินค้าสถานะ INACTIVE จาก Shopify ลงหน้า "Inactive" (เร็วที่สุด 3-5 วินาที)
  */
 function getInactiveStatusFromProductsExport() {
-  fetchInactiveProductsBulkMutation();
+  fetchProductsDirectFromShopify_("status:DRAFT OR status:ARCHIVED", "Inactive");
 }
 
 // ============================================================
-// ULTRA FAST METHOD: SHOPIFY BULK OPERATION QUERY (3-5 วินาทีสำหรับ 40,000+ รายการ)
+// CORE LOGIC: SHOPIFY BULK OPERATION QUERY (3-5 วินาที)
 // ============================================================
 
-function fetchActiveProductsBulkMutation() {
-  fetchProductsBulk_("status:ACTIVE", STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME || "Active Products");
-}
-
-function fetchInactiveProductsBulkMutation() {
-  fetchProductsBulk_("status:DRAFT OR status:ARCHIVED", "Inactive");
-}
-
-function fetchProductsBulk_(statusQuery, targetSheetName) {
-  Logger.log(`=== [ULTRA-FAST BULK QUERY] เริ่มดึงสินค้า (${statusQuery}) ผ่าน Shopify Bulk Operation API ===`);
+function fetchProductsDirectFromShopify_(statusQuery, targetSheetName) {
+  Logger.log(`=== เริ่มดึงสินค้า (${statusQuery}) โดยตรงจาก Shopify API ===`);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   
   // 1. ตรวจสอบว่ามี Bulk Operation อื่นค้างอยู่หรือไม่
@@ -74,7 +59,7 @@ function fetchProductsBulk_(statusQuery, targetSheetName) {
     }
   }
   
-  // 2. ส่งคำสั่งให้ Shopify ดึงสินค้าผ่าน Bulk Operation Query
+  // 2. ส่งคำสั่งดึงสินค้าผ่าน Bulk Operation Query
   const bulkQuery = `mutation {
     bulkOperationRunQuery(
       query: """
@@ -118,9 +103,9 @@ function fetchProductsBulk_(statusQuery, targetSheetName) {
     return;
   }
   
-  Logger.log("🚀 ส่งคำสั่ง Bulk Query สำเร็จ! กำลังรอ Shopify ประมวลผลไฟล์...");
+  Logger.log("🚀 ส่งคำสั่ง Bulk Query สำเร็จ! กำลังรอ Shopify ประมวลผล...");
   
-  // 3. Poll รอรับ Download URL (ใช้เวลาประมาณ 2 วินาที)
+  // 3. Poll รอรับ Download URL
   const pollQuery = `{ currentBulkOperation { id status errorCode objectCount fileSize url } }`;
   let downloadUrl = null;
   let attempts = 0;
@@ -132,7 +117,6 @@ function fetchProductsBulk_(statusQuery, targetSheetName) {
     const op = pollRes ? pollRes.data.currentBulkOperation : null;
     
     if (op) {
-      Logger.log(`  [Poll ${attempts}] Status: ${op.status} | Objects: ${op.objectCount || 0}`);
       if (op.status === "COMPLETED") {
         downloadUrl = op.url;
         break;
@@ -148,9 +132,8 @@ function fetchProductsBulk_(statusQuery, targetSheetName) {
     return;
   }
   
-  Logger.log("⚡ ดาวน์โหลดไฟล์ผลลัพธ์ JSONL จาก Shopify...");
-  
-  // 4. ดาวน์โหลดไฟล์ JSONL และแปลงลง Google Sheet
+  // 4. ดาวน์โหลดและจัดโครงสร้างข้อมูล 5 คอลัมน์ตามที่ระบุ
+  // custom.good_id, Variant SKU, Product GID, Variant GID, status
   const fileRes = UrlFetchApp.fetch(downloadUrl);
   const jsonlContent = fileRes.getContentText();
   const lines = jsonlContent.split("\n");
@@ -159,7 +142,7 @@ function fetchProductsBulk_(statusQuery, targetSheetName) {
   const targetHeaders = ["custom.good_id", "Variant SKU", "Product GID", "Variant GID", "status"];
   const rows = [targetHeaders];
   
-  // Parse JSONL: เก็บข้อมูล Product (แม่)
+  // Parse Product (แม่)
   lines.forEach(line => {
     if (!line.trim()) return;
     try {
@@ -171,7 +154,7 @@ function fetchProductsBulk_(statusQuery, targetSheetName) {
     } catch (e) {}
   });
   
-  // Parse JSONL: แมป Variant (ลูก) เข้ากับ Product (แม่)
+  // Parse Variant (ลูก)
   lines.forEach(line => {
     if (!line.trim()) return;
     try {
@@ -189,8 +172,7 @@ function fetchProductsBulk_(statusQuery, targetSheetName) {
     } catch (e) {}
   });
   
-  Logger.log(`📊 แปลงข้อมูลเสร็จสิ้น! ได้ทั้งหมด ${rows.length - 1} แถว เขียนลง Sheet "${targetSheetName}"...`);
-  
+  // 5. เขียนข้อมูลลง Sheet ปลายทาง (แบ่ง Chunk ละ 5,000 แถว)
   let targetSheet = ss.getSheetByName(targetSheetName);
   if (!targetSheet) {
     targetSheet = ss.insertSheet(targetSheetName);
@@ -210,7 +192,6 @@ function fetchProductsBulk_(statusQuery, targetSheetName) {
   if (currentRows < numRows) targetSheet.insertRowsAfter(currentRows, numRows - currentRows);
   else if (currentRows > numRows) targetSheet.deleteRows(numRows + 1, currentRows - numRows);
   
-  // เขียนข้อมูลแบบ Chunk ละ 5,000 แถว
   const WRITE_CHUNK_SIZE = 5000;
   for (let i = 0; i < numRows; i += WRITE_CHUNK_SIZE) {
     const chunk = rows.slice(i, i + WRITE_CHUNK_SIZE);
@@ -220,144 +201,9 @@ function fetchProductsBulk_(statusQuery, targetSheetName) {
   targetSheet.getRange(1, 1, 1, numCols).setFontWeight("bold");
   targetSheet.setFrozenRows(1);
   
-  const successMsg = `⚡ [ULTRA-FAST SUCCESS] ดึงสินค้าสถานะ ${statusQuery} สำเร็จทั้งหมด ${rows.length - 1} แถว ลงใน Sheet "${targetSheetName}" (ใช้เวลา 3-5 วินาที)`;
+  const successMsg = `✅ ดึงข้อมูลสินค้าสถานะ ${statusQuery} จาก Shopify สำเร็จ ${rows.length - 1} แถว ลงใน Sheet "${targetSheetName}"`;
   Logger.log(successMsg);
   writeStatusLog_(targetSheetName, rows.length - 1, rows.length - 1, 0, successMsg);
-}
-
-// ============================================================
-// METHOD 2: PAGINATED GRAPHQL (15-20 วินาที)
-// ============================================================
-
-function fetchAllActiveProductsFull() {
-  fetchProductsFromShopifyByStatus_("ACTIVE", STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME || "Active Products");
-}
-
-function fetchAllInactiveProductsFull() {
-  fetchProductsFromShopifyByStatus_("DRAFT", "Inactive");
-}
-
-function fetchProductsFromShopifyByStatus_(statusFilter, targetSheetName) {
-  Logger.log(`=== เริ่มดึงสินค้าสถานะ [${statusFilter}] แบบ Paginated GraphQL ===`);
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  
-  const targetHeaders = ["custom.good_id", "Variant SKU", "Product GID", "Variant GID", "status"];
-  const allRows = [targetHeaders];
-  
-  let cursor = null;
-  let pageCount = 0;
-  let totalFetched = 0;
-  
-  const statusQueryStr = (statusFilter === "ACTIVE") ? "status:ACTIVE" : "status:DRAFT OR status:ARCHIVED";
-  
-  while (true) {
-    const query = `query getProducts($cursor: String) {
-      products(first: 250, query: "${statusQueryStr}", after: $cursor) {
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
-        edges {
-          node {
-            id
-            status
-            metafields(first: 10) {
-              edges { node { namespace key value } }
-            }
-            variants(first: 10) {
-              edges { node { id sku } }
-            }
-          }
-        }
-      }
-    }`;
-    
-    const res = callGraphQL_({ query: query, variables: { cursor: cursor } });
-    if (!res || !res.data || !res.data.products) break;
-    
-    const pData = res.data.products;
-    const edges = pData.edges || [];
-    pageCount++;
-    totalFetched += edges.length;
-    
-    edges.forEach(edge => {
-      const p = edge.node;
-      const variants = (p.variants && p.variants.edges) ? p.variants.edges : [{}];
-      
-      let goodId = "";
-      if (p.metafields && p.metafields.edges) {
-        p.metafields.edges.forEach(mf => {
-          if (mf.node.namespace === "custom" && mf.node.key === "good_id") {
-            goodId = mf.node.value;
-          }
-        });
-      }
-      
-      variants.forEach(vEdge => {
-        const v = vEdge.node || {};
-        allRows.push([
-          goodId,
-          v.sku || "",
-          p.id || "",
-          v.id || "",
-          p.status || statusFilter
-        ]);
-      });
-    });
-    
-    if (!pData.pageInfo || !pData.pageInfo.hasNextPage) break;
-    cursor = pData.pageInfo.endCursor;
-    Utilities.sleep(100);
-  }
-  
-  let targetSheet = ss.getSheetByName(targetSheetName);
-  if (!targetSheet) targetSheet = ss.insertSheet(targetSheetName);
-  else targetSheet.clear();
-  
-  const numRows = allRows.length;
-  const numCols = targetHeaders.length;
-  
-  const WRITE_CHUNK_SIZE = 5000;
-  for (let i = 0; i < numRows; i += WRITE_CHUNK_SIZE) {
-    const chunk = allRows.slice(i, i + WRITE_CHUNK_SIZE);
-    targetSheet.getRange(i + 1, 1, chunk.length, numCols).setValues(chunk);
-  }
-  
-  targetSheet.getRange(1, 1, 1, numCols).setFontWeight("bold");
-  targetSheet.setFrozenRows(1);
-}
-
-// ============================================================
-// FORMULA QUERY METHOD (1 วินาที)
-// ============================================================
-
-function getActiveProductsViaQuery() {
-  applyQueryFormula_(STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME || "Active Products", "WHERE Upper(Col12) = 'ACTIVE'");
-}
-
-function getInactiveProductsViaQuery() {
-  applyQueryFormula_("Inactive", "WHERE Upper(Col12) <> 'ACTIVE'");
-}
-
-function applyQueryFormula_(targetSheetName, whereClause) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let targetSheet = ss.getSheetByName(targetSheetName);
-  if (!targetSheet) targetSheet = ss.insertSheet(targetSheetName);
-  else targetSheet.clear();
-  
-  const sourceId = STATUS_EXPORT_CONFIG.SOURCE_SPREADSHEET_ID;
-  const sourceSheetName = STATUS_EXPORT_CONFIG.SOURCE_SHEET_NAME;
-  
-  const formula = `=QUERY(IMPORTRANGE("${sourceId}", "${sourceSheetName}!A:L"), "SELECT Col1, Col2, Col3, Col4, Col12 ${whereClause}", 1)`;
-  targetSheet.getRange("A1").setFormula(formula);
-  SpreadsheetApp.flush();
-}
-
-function convertFormulasToValues() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getActiveSheet();
-  const range = sheet.getDataRange();
-  range.setValues(range.getValues());
 }
 
 // ============================================================
