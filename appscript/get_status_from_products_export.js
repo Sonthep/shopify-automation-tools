@@ -7,6 +7,7 @@ var STATUS_EXPORT_CONFIG = {
   CLIENT_SECRET: "xxxxxxxxxxxxxxxxxxx",
   SOURCE_SPREADSHEET_ID: "1hfHjhC7WdjVDT7qHt19PL8AnxlhTJ6rbbh-N4UBQJBA",
   SOURCE_SHEET_NAME: "Products Export",
+  TARGET_SHEET_NAME: "Active Products",
   LOG_SHEET_NAME: "Log run script",
   PROP_ACCESS_TOKEN: "ACCESS_TOKEN",
   PROP_TOKEN_EXPIRY: "TOKEN_EXPIRY"
@@ -51,7 +52,7 @@ function getInactiveStatusFromProductsExport() {
 // ============================================================
 
 function fetchActiveProductsBulkMutation() {
-  fetchProductsBulk_("status:ACTIVE", "Active Products");
+  fetchProductsBulk_("status:ACTIVE", STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME || "Active Products");
 }
 
 function fetchInactiveProductsBulkMutation() {
@@ -229,7 +230,7 @@ function fetchProductsBulk_(statusQuery, targetSheetName) {
 // ============================================================
 
 function fetchAllActiveProductsFull() {
-  fetchProductsFromShopifyByStatus_("ACTIVE", "Active Products");
+  fetchProductsFromShopifyByStatus_("ACTIVE", STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME || "Active Products");
 }
 
 function fetchAllInactiveProductsFull() {
@@ -331,7 +332,7 @@ function fetchProductsFromShopifyByStatus_(statusFilter, targetSheetName) {
 // ============================================================
 
 function getActiveProductsViaQuery() {
-  applyQueryFormula_("Active Products", "WHERE Upper(Col12) = 'ACTIVE'");
+  applyQueryFormula_(STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME || "Active Products", "WHERE Upper(Col12) = 'ACTIVE'");
 }
 
 function getInactiveProductsViaQuery() {
