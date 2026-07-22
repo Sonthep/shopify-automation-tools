@@ -18,118 +18,242 @@ var STATUS_EXPORT_CONFIG = {
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('📦 Product Status Tools')
-    .addItem('🚀 1. ดึง 10 รายการ Active ทันทีจาก Shopify API (0.5 วินาที)', 'fetchActiveProductsDirectlyFromShopify10')
-    .addItem('2. ดึง 50 รายการ Active ทันทีจาก Shopify API (1 วินาที)', 'fetchActiveProductsDirectlyFromShopify50')
+    .addItem('🚀 1. ดึงสินค้า Active ทั้งหมด (Full Version - จาก Shopify API)', 'fetchAllActiveProductsFull')
+    .addItem('🚀 2. ดึงสินค้า Inactive ทั้งหมด (Full Version - จาก Shopify API)', 'fetchAllInactiveProductsFull')
     .addSeparator()
-    .addItem('3. ดึงด้วยสูตร URL IMPORTRANGE (10 แถว)', 'applyFullUrlImportRangeFormula')
+    .addItem('3. ดึงสินค้า Active ทั้งหมด (สูตร QUERY IMPORTRANGE - 1 วินาที)', 'getActiveProductsViaQuery')
+    .addItem('4. ดึงสินค้า Inactive ทั้งหมด (สูตร QUERY IMPORTRANGE - 1 วินาที)', 'getInactiveProductsViaQuery')
+    .addSeparator()
+    .addItem('5. แปลงสูตรใน Sheet ปัจจุบันเป็นข้อความปกติ (Freeze Values)', 'convertFormulasToValues')
     .addToUi();
 }
 
 // ============================================================
-// MAIN FUNCTIONS (ดึงตรงจาก Shopify API ทันที 0.5 วินาที)
+// MAIN FUNCTIONS
 // ============================================================
 
+/**
+ * ดึงสินค้าสถานะ ACTIVE ทั้งหมดแบบ FULL VERSION (ฟังก์ชั่นเดิมเพื่อรองรับการเรียกใช้)
+ */
 function getStatusFromProductsExport() {
-  fetchActiveProductsDirectlyFromShopify10();
-}
-
-function fetchActiveProductsDirectlyFromShopify10() {
-  fetchActiveProductsDirectlyFromShopify_(10);
-}
-
-function fetchActiveProductsDirectlyFromShopify50() {
-  fetchActiveProductsDirectlyFromShopify_(50);
+  fetchAllActiveProductsFull();
 }
 
 /**
- * ดึงข้อมูลสินค้าสถานะ ACTIVE โดยตรงจาก Shopify GraphQL API
- * ไม่ผ่าน IMPORTRANGE และไม่ผ่าน openById ทำให้ประมวลผลเสร็จใน 0.5 วินาที!
+ * ดึงสินค้าสถานะ INACTIVE ทั้งหมดแบบ FULL VERSION (ฟังก์ชั่นเดิมเพื่อรองรับการเรียกใช้)
  */
-function fetchActiveProductsDirectlyFromShopify_(limitCount) {
-  limitCount = limitCount || 10;
-  Logger.log(`=== เริ่มดึงสินค้า ACTIVE จำนวน ${limitCount} รายการจาก Shopify API ===`);
+function getInactiveStatusFromProductsExport() {
+  fetchAllInactiveProductsFull();
+}
+
+/**
+ * ดึงสินค้าสถานะ ACTIVE ทั้งหมดแบบ FULL VERSION ตรงจาก Shopify API
+ */
+function fetchAllActiveProductsFull() {
+  fetchProductsFromShopifyByStatus_("ACTIVE", "Active Products");
+}
+
+/**
+ * ดึงสินค้าสถานะ INACTIVE / DRAFT ทั้งหมดแบบ FULL VERSION ตรงจาก Shopify API
+ */
+function fetchAllInactiveProductsFull() {
+  fetchProductsFromShopifyByStatus_("DRAFT", "Inactive");
+}
+
+// ============================================================
+// CORE PROCESSING LOGIC (Paginated GraphQL Fetch + Chunk Write)
+// ============================================================
+
+function fetchProductsFromShopifyByStatus_(statusFilter, targetSheetName) {
+  Logger.log(`=== เริ่มดึงสินค้าสถานะ [${statusFilter}] ทั้งหมดแบบ FULL VERSION จาก Shopify API ===`);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   
-  const query = `{
-    products(first: ${limitCount}, query: "status:ACTIVE") {
-      edges {
-        node {
-          id
-          status
-          metafields(first: 10) {
-            edges { node { namespace key value } }
-          }
-          variants(first: 1) {
-            edges { node { id sku } }
+  const targetHeaders = ["custom.good_id", "Variant SKU", "Product GID", "Variant GID", "status"];
+  const allRows = [targetHeaders];
+  
+  let cursor = null;
+  let pageCount = 0;
+  let totalFetched = 0;
+  
+  const statusQueryStr = (statusFilter === "ACTIVE") ? "status:ACTIVE" : "status:DRAFT OR status:ARCHIVED";
+  
+  while (true) {
+    const query = `query getProducts($cursor: String) {
+      products(first: 250, query: "${statusQueryStr}", after: $cursor) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        edges {
+          node {
+            id
+            status
+            metafields(first: 10) {
+              edges { node { namespace key value } }
+            }
+            variants(first: 10) {
+              edges { node { id sku } }
+            }
           }
         }
       }
+    }`;
+    
+    const res = callGraphQL_({ query: query, variables: { cursor: cursor } });
+    if (!res || !res.data || !res.data.products) {
+      Logger.log("❌ ไม่สามารถดึงข้อมูลจาก Shopify API ได้ที่หน้า " + (pageCount + 1));
+      break;
     }
-  }`;
+    
+    const pData = res.data.products;
+    const edges = pData.edges || [];
+    pageCount++;
+    totalFetched += edges.length;
+    
+    edges.forEach(edge => {
+      const p = edge.node;
+      const variants = (p.variants && p.variants.edges) ? p.variants.edges : [{}];
+      
+      let goodId = "";
+      if (p.metafields && p.metafields.edges) {
+        p.metafields.edges.forEach(mf => {
+          if (mf.node.namespace === "custom" && mf.node.key === "good_id") {
+            goodId = mf.node.value;
+          }
+        });
+      }
+      
+      variants.forEach(vEdge => {
+        const v = vEdge.node || {};
+        allRows.push([
+          goodId,
+          v.sku || "",
+          p.id || "",
+          v.id || "",
+          p.status || statusFilter
+        ]);
+      });
+    });
+    
+    Logger.log(`  หน้า ${pageCount}: ดึงแล้ว ${edges.length} สินค้า (รวมสะสม ${totalFetched} สินค้า / ${allRows.length - 1} ตารางแถว)`);
+    
+    if (!pData.pageInfo || !pData.pageInfo.hasNextPage) {
+      break;
+    }
+    cursor = pData.pageInfo.endCursor;
+    Utilities.sleep(100);
+  }
   
-  const res = callGraphQL_({ query: query });
-  if (!res || !res.data || !res.data.products) {
-    Logger.log("❌ ไม่สามารถดึงข้อมูลจาก Shopify API ได้");
+  if (allRows.length <= 1) {
+    Logger.log("⚠️ ไม่พบข้อมูลสินค้าสถานะ " + statusFilter);
     return;
   }
   
-  const targetHeaders = ["custom.good_id", "Variant SKU", "Product GID", "Variant GID", "status"];
-  const rows = [targetHeaders];
+  Logger.log(`📊 ดึงข้อมูลเสร็จสิ้น! กำลังเขียนข้อมูลทั้งหมด ${allRows.length - 1} แถวลงใน Sheet "${targetSheetName}"...`);
   
-  const edges = res.data.products.edges || [];
-  edges.forEach(edge => {
-    const p = edge.node;
-    const v = (p.variants && p.variants.edges.length > 0) ? p.variants.edges[0].node : {};
-    
-    let goodId = "";
-    if (p.metafields && p.metafields.edges) {
-      p.metafields.edges.forEach(mf => {
-        if (mf.node.namespace === "custom" && mf.node.key === "good_id") {
-          goodId = mf.node.value;
-        }
-      });
-    }
-    
-    rows.push([
-      goodId,
-      v.sku || "",
-      p.id || "",
-      v.id || "",
-      "ACTIVE"
-    ]);
-  });
-  
-  let targetSheet = ss.getSheetByName("Active Products");
+  let targetSheet = ss.getSheetByName(targetSheetName);
   if (!targetSheet) {
-    targetSheet = ss.insertSheet("Active Products");
+    targetSheet = ss.insertSheet(targetSheetName);
   } else {
     targetSheet.clear();
   }
   
-  targetSheet.getRange(1, 1, rows.length, 5).setValues(rows);
-  targetSheet.getRange(1, 1, 1, 5).setFontWeight("bold");
+  const numRows = allRows.length;
+  const numCols = targetHeaders.length;
+  
+  const currentRows = targetSheet.getMaxRows();
+  const currentCols = targetSheet.getMaxColumns();
+  
+  if (currentCols < numCols) {
+    targetSheet.insertColumnsAfter(currentCols, numCols - currentCols);
+  } else if (currentCols > numCols) {
+    targetSheet.deleteColumns(numCols + 1, currentCols - numCols);
+  }
+  
+  if (currentRows < numRows) {
+    targetSheet.insertRowsAfter(currentRows, numRows - currentRows);
+  } else if (currentRows > numRows) {
+    targetSheet.deleteRows(numRows + 1, currentRows - numRows);
+  }
+  
+  // เขียนข้อมูลแบบแบ่ง Chunk ละ 5,000 แถว
+  const WRITE_CHUNK_SIZE = 5000;
+  for (let i = 0; i < numRows; i += WRITE_CHUNK_SIZE) {
+    const chunk = allRows.slice(i, i + WRITE_CHUNK_SIZE);
+    targetSheet.getRange(i + 1, 1, chunk.length, numCols).setValues(chunk);
+  }
+  
+  targetSheet.getRange(1, 1, 1, numCols).setFontWeight("bold");
   targetSheet.setFrozenRows(1);
   
-  Logger.log(`✅ [SUCCESS] ดึงข้อมูลสำเร็จ ${rows.length - 1} รายการ ลงใน Sheet "Active Products" เรียบร้อยแล้ว (ใช้เวลา 0.5 วินาที)`);
+  const successMsg = `✅ [FULL VERSION SUCCESS] ดึงสินค้าสถานะ ${statusFilter} สำเร็จทั้งหมด ${allRows.length - 1} แถว ลงใน Sheet "${targetSheetName}"`;
+  Logger.log(successMsg);
+  writeStatusLog_(targetSheetName, allRows.length - 1, allRows.length - 1, 0, successMsg);
 }
 
-/**
- * ทางเลือกสูตร URL IMPORTRANGE เต็ม (สำหรับใส่หน้า Sheet)
- */
-function applyFullUrlImportRangeFormula() {
+// ============================================================
+// FORMULA QUERY METHOD (สูตร QUERY IMPORTRANGE 1 วินาที)
+// ============================================================
+
+function getActiveProductsViaQuery() {
+  applyQueryFormula_("Active Products", "WHERE Upper(Col12) = 'ACTIVE'");
+}
+
+function getInactiveProductsViaQuery() {
+  applyQueryFormula_("Inactive", "WHERE Upper(Col12) <> 'ACTIVE'");
+}
+
+function applyQueryFormula_(targetSheetName, whereClause) {
+  Logger.log(`=== เริ่มใส่สูตร QUERY ดึงสินค้า [${targetSheetName}] ===`);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let targetSheet = ss.getSheetByName("Active Products");
-  if (!targetSheet) targetSheet = ss.insertSheet("Active Products");
-  else targetSheet.clear();
   
-  const fullUrl = "https://docs.google.com/spreadsheets/d/1hfHjhC7WdjVDT7qHt19PL8AnxlhTJ6rbbh-N4UBQJBA/edit";
-  const formula = `=IMPORTRANGE("${fullUrl}", "Products Export!A1:D11")`;
+  let targetSheet = ss.getSheetByName(targetSheetName);
+  if (!targetSheet) {
+    targetSheet = ss.insertSheet(targetSheetName);
+  } else {
+    targetSheet.clear();
+  }
+  
+  const sourceId = STATUS_EXPORT_CONFIG.SOURCE_SPREADSHEET_ID;
+  const sourceSheetName = STATUS_EXPORT_CONFIG.SOURCE_SHEET_NAME;
+  
+  const formula = `=QUERY(IMPORTRANGE("${sourceId}", "${sourceSheetName}!A:L"), "SELECT Col1, Col2, Col3, Col4, Col12 ${whereClause}", 1)`;
+  
   targetSheet.getRange("A1").setFormula(formula);
+  SpreadsheetApp.flush();
+  
+  Logger.log(`✅ ใส่สูตรลงใน Sheet "${targetSheetName}" เซลล์ A1 เรียบร้อยแล้ว!`);
+}
+
+function convertFormulasToValues() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getActiveSheet();
+  const range = sheet.getDataRange();
+  range.setValues(range.getValues());
+  Logger.log("✅ แปลงสูตรใน Sheet " + sheet.getName() + " เป็นค่าข้อความปกติเรียบร้อยแล้ว");
 }
 
 // ============================================================
-// HELPER: AUTH (Auto Refresh Access Token)
+// HELPER FUNCTIONS
 // ============================================================
+
+function writeStatusLog_(targetSheetName, totalItems, successCount, failedCount, statusMsg) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let logSheet = ss.getSheetByName(STATUS_EXPORT_CONFIG.LOG_SHEET_NAME);
+    if (!logSheet) {
+      logSheet = ss.insertSheet(STATUS_EXPORT_CONFIG.LOG_SHEET_NAME);
+      const headers = ["Timestamp", "Target Sheet", "Total Items", "Success", "Failed / Skipped", "Status Message"];
+      logSheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
+      logSheet.setFrozenRows(1);
+    }
+    const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "GMT+7", "yyyy-MM-dd HH:mm:ss");
+    logSheet.appendRow([timestamp, targetSheetName, totalItems, successCount, failedCount, statusMsg || "Completed"]);
+  } catch (e) {
+    Logger.log("⚠️ Could not write log: " + e);
+  }
+}
+
 function getAccessToken_() {
   const props  = PropertiesService.getScriptProperties();
   const token  = props.getProperty(STATUS_EXPORT_CONFIG.PROP_ACCESS_TOKEN);
@@ -158,9 +282,6 @@ function getAccessToken_() {
   return data.access_token;
 }
 
-// ============================================================
-// HELPER: GRAPHQL CALLER WITH AUTO-RETRY ON THROTTLE / 401
-// ============================================================
 function callGraphQL_(payload) {
   let maxRetries = 5;
   let waitMs = 2000;
