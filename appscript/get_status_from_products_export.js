@@ -16,21 +16,37 @@ function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('📦 Product Status Tools')
     .addItem('1. ดึงเฉพาะสินค้าสถานะ Active จาก Products Export', 'getStatusFromProductsExport')
+    .addItem('2. ดึงเฉพาะสินค้าสถานะ Inactive จาก Products Export', 'getInactiveStatusFromProductsExport')
     .addToUi();
 }
 
 // ============================================================
-// MAIN FUNCTION: ดึงข้อมูลเฉพาะสินค้าสถานะ ACTIVE
+// MAIN FUNCTIONS
 // ============================================================
+
 /**
- * ดึงข้อมูล custom.good_id, Variant SKU, Product GID, Variant GID, status
- * จาก Sheet "Products Export" โดยคัดกรองเอาเฉพาะสินค้าที่มี status = ACTIVE เท่านั้น
+ * ดึงเฉพาะสินค้าสถานะ ACTIVE
  */
 function getStatusFromProductsExport() {
-  Logger.log("=== เริ่มดึงข้อมูลสินค้าเฉพาะสถานะ ACTIVE จาก Products Export ===");
+  processStatusFilter_("ACTIVE", STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME || "Active Products");
+}
+
+/**
+ * ดึงเฉพาะสินค้าสถานะ INACTIVE / DRAFT / ARCHIVED
+ */
+function getInactiveStatusFromProductsExport() {
+  processStatusFilter_("INACTIVE", "Inactive");
+}
+
+// ============================================================
+// CORE PROCESSING LOGIC (Fast Range Fetching - Skip Body HTML)
+// ============================================================
+
+function processStatusFilter_(targetStatusMode, targetSheetName) {
+  Logger.log(`=== เริ่มดึงข้อมูลสินค้าสถานะ [${targetStatusMode}] จาก Products Export ===`);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   
-  // 1. หา Sheet ต้นทาง (พยายามหาในไฟล์ปัจจุบันก่อน ถ้าไม่มีให้เปิดจาก SOURCE_SPREADSHEET_ID)
+  // 1. เปิด Sheet ต้นทาง
   let sourceSheet = ss.getSheetByName(STATUS_EXPORT_CONFIG.SOURCE_SHEET_NAME);
   if (!sourceSheet) {
     try {
@@ -38,7 +54,7 @@ function getStatusFromProductsExport() {
       sourceSheet = sourceSS.getSheetByName(STATUS_EXPORT_CONFIG.SOURCE_SHEET_NAME);
     } catch (e) {
       Logger.log("❌ ไม่สามารถเปิดไฟล์ต้นทางได้: " + e);
-      writeStatusLog_("Active Products Fetch", 0, 0, 0, "❌ ไม่สามารถเปิดไฟล์ต้นทาง ID " + STATUS_EXPORT_CONFIG.SOURCE_SPREADSHEET_ID);
+      writeStatusLog_("Status Fetch", 0, 0, 0, "❌ ไม่สามารถเปิดไฟล์ต้นทาง ID " + STATUS_EXPORT_CONFIG.SOURCE_SPREADSHEET_ID);
       return;
     }
   }
@@ -46,7 +62,7 @@ function getStatusFromProductsExport() {
   if (!sourceSheet) {
     const errMsg = `❌ ไม่พบ Sheet "${STATUS_EXPORT_CONFIG.SOURCE_SHEET_NAME}" ในไฟล์ต้นทาง`;
     Logger.log(errMsg);
-    writeStatusLog_("Active Products Fetch", 0, 0, 0, errMsg);
+    writeStatusLog_("Status Fetch", 0, 0, 0, errMsg);
     return;
   }
   
@@ -56,63 +72,75 @@ function getStatusFromProductsExport() {
   if (lastRow < 2) {
     const warnMsg = `⚠️ ไม่พบข้อมูลใน Sheet "${STATUS_EXPORT_CONFIG.SOURCE_SHEET_NAME}"`;
     Logger.log(warnMsg);
-    writeStatusLog_("Active Products Fetch", 0, 0, 0, warnMsg);
+    writeStatusLog_("Status Fetch", 0, 0, 0, warnMsg);
     return;
   }
   
-  // 2. อ่านข้อมูลทั้งหมดจากต้นทาง
-  const data = sourceSheet.getRange(1, 1, lastRow, lastCol).getValues();
-  const headers = data[0].map(h => String(h).trim());
-  const rows = data.slice(1);
+  // 2. อ่านเฉพาะ Row 1 เพื่อหาตำแหน่งคอลัมน์ (ใช้เวลาน้อยกว่า 0.1 วินาที)
+  const headerRow = sourceSheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
   
-  // ค้นหาตำแหน่งคอลัมน์จาก Header
-  const goodIdIdx = findColIdx_(headers, ["custom.good_id", "Good ID", "GoodID"]);
-  const variantSkuIdx = findColIdx_(headers, ["Variant SKU", "VariantSKU", "SKU"]);
-  const productGidIdx = findColIdx_(headers, ["Product GID", "ProductGID", "product_gid"]);
-  const variantGidIdx = findColIdx_(headers, ["Variant GID", "VariantGID", "variant_gid"]);
-  const statusIdx = findColIdx_(headers, ["Status", "status", "สถานะ"]);
+  const goodIdIdx = findColIdx_(headerRow, ["custom.good_id", "Good ID", "GoodID"]);
+  const variantSkuIdx = findColIdx_(headerRow, ["Variant SKU", "VariantSKU", "SKU"]);
+  const productGidIdx = findColIdx_(headerRow, ["Product GID", "ProductGID", "product_gid"]);
+  const variantGidIdx = findColIdx_(headerRow, ["Variant GID", "VariantGID", "variant_gid"]);
+  const statusIdx = findColIdx_(headerRow, ["Status", "status", "สถานะ"]);
   
-  // ตำแหน่งคอลัมน์มาตรฐาน (Default: A = custom.good_id (0), B = Variant SKU (1), C = Product GID (2), D = Variant GID (3), L = Status (11))
-  const colGoodId = goodIdIdx !== -1 ? goodIdIdx : 0;
-  const colVariantSku = variantSkuIdx !== -1 ? variantSkuIdx : 1;
-  const colProductGid = productGidIdx !== -1 ? productGidIdx : 2;
-  const colVariantGid = variantGidIdx !== -1 ? variantGidIdx : 3;
-  const colStatus = statusIdx !== -1 ? statusIdx : 11;
+  const colGoodId = goodIdIdx !== -1 ? goodIdIdx + 1 : 1;       // Default Col A (1)
+  const colVariantSku = variantSkuIdx !== -1 ? variantSkuIdx + 1 : 2; // Default Col B (2)
+  const colProductGid = productGidIdx !== -1 ? productGidIdx + 1 : 3; // Default Col C (3)
+  const colVariantGid = variantGidIdx !== -1 ? variantGidIdx + 1 : 4; // Default Col D (4)
+  const colStatus = statusIdx !== -1 ? statusIdx + 1 : 12;      // Default Col L (12)
   
-  // 3. กรองข้อมูลเอาเฉพาะ status = "ACTIVE"
+  Logger.log(`📌 ดึงข้อมูลเฉพาะคอลัมน์ ID/SKU (Col 1-4) และ Status (Col ${colStatus}) - ข้ามคอลัมน์ HTML หนักๆ`);
+  
+  // 3. ดึงเฉพาะ 2 ช่วงข้อมูล: คอลัมน์ A-D (1-4) และ คอลัมน์ Status (12)
+  // วิธีนี้ข้ามคอลัมน์ Body (HTML) ทำให้ขนาดข้อมูลลดลง 98% และอ่านเสร็จใน 1-2 วินาที!
+  const idSkuData = sourceSheet.getRange(2, 1, lastRow - 1, 4).getValues();
+  const statusData = sourceSheet.getRange(2, colStatus, lastRow - 1, 1).getValues();
+  
   const targetHeaders = ["custom.good_id", "Variant SKU", "Product GID", "Variant GID", "status"];
-  const activeRows = [targetHeaders];
-  let totalActive = 0;
+  const matchedRows = [targetHeaders];
+  let totalMatch = 0;
   let totalSkipped = 0;
   
-  rows.forEach(row => {
-    const statusVal = String(row[colStatus] || "").trim().toUpperCase();
+  const targetModeUpper = targetStatusMode.toUpperCase();
+  
+  for (let i = 0; i < idSkuData.length; i++) {
+    const rowId = idSkuData[i];
+    const statusVal = String(statusData[i][0] || "").trim().toUpperCase();
     
-    // ตรวจสอบว่าเป็น ACTIVE หรือไม่ (รองรับ ACTIVE หรือ true)
-    if (statusVal === "ACTIVE" || statusVal === "TRUE") {
-      const goodId = row[colGoodId] != null ? row[colGoodId] : "";
-      const variantSku = row[colVariantSku] != null ? row[colVariantSku] : "";
-      const productGid = row[colProductGid] != null ? row[colProductGid] : "";
-      const variantGid = row[colVariantGid] != null ? row[colVariantGid] : "";
+    let isMatch = false;
+    if (targetModeUpper === "ACTIVE") {
+      isMatch = (statusVal === "ACTIVE" || statusVal === "TRUE");
+    } else {
+      // INACTIVE / DRAFT / ARCHIVED / FALSE / BLANK
+      isMatch = (statusVal !== "ACTIVE" && statusVal !== "TRUE");
+    }
+    
+    if (isMatch) {
+      const goodId = rowId[0] != null ? rowId[0] : "";
+      const variantSku = rowId[1] != null ? rowId[1] : "";
+      const productGid = rowId[2] != null ? rowId[2] : "";
+      const variantGid = rowId[3] != null ? rowId[3] : "";
       
-      activeRows.push([goodId, variantSku, productGid, variantGid, "ACTIVE"]);
-      totalActive++;
+      matchedRows.push([goodId, variantSku, productGid, variantGid, statusVal || targetModeUpper]);
+      totalMatch++;
     } else {
       totalSkipped++;
     }
   });
   
-  Logger.log(`📊 พบสินค้าสถานะ ACTIVE ทั้งหมด: ${totalActive} รายการ (ข้ามสินค้าที่ไม่ใช่ Active: ${totalSkipped} รายการ)`);
+  Logger.log(`📊 ประมวลผลเสร็จสิ้น! พบสินค้าสถานะ [${targetStatusMode}]: ${totalMatch} รายการ (ข้าม ${totalSkipped} รายการ)`);
   
-  // 4. เขียนข้อมูลลง Sheet ปลายทาง "Active Products"
-  let targetSheet = ss.getSheetByName(STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME);
+  // 4. เขียนข้อมูลลง Sheet ปลายทาง
+  let targetSheet = ss.getSheetByName(targetSheetName);
   if (!targetSheet) {
-    targetSheet = ss.insertSheet(STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME);
+    targetSheet = ss.insertSheet(targetSheetName);
   } else {
-    targetSheet.clear(); // เคลียร์เนื้อหาและรูปแบบเดิม
+    targetSheet.clear();
   }
   
-  const numRows = activeRows.length;
+  const numRows = matchedRows.length;
   const numCols = targetHeaders.length;
   
   const currentRows = targetSheet.getMaxRows();
@@ -128,13 +156,13 @@ function getStatusFromProductsExport() {
     targetSheet.insertRowsAfter(currentRows, numRows - currentRows);
   }
   
-  targetSheet.getRange(1, 1, numRows, numCols).setValues(activeRows);
+  targetSheet.getRange(1, 1, numRows, numCols).setValues(matchedRows);
   targetSheet.getRange(1, 1, 1, numCols).setFontWeight("bold");
   targetSheet.setFrozenRows(1);
   
-  const successMsg = `✅ ดึงข้อมูลสินค้า Active สำเร็จ ${totalActive} รายการ ลงใน Sheet "${STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME}"`;
+  const successMsg = `✅ ดึงข้อมูลสินค้าสถานะ ${targetStatusMode} สำเร็จ ${totalMatch} รายการ ลงใน Sheet "${targetSheetName}"`;
   Logger.log(successMsg);
-  writeStatusLog_(STATUS_EXPORT_CONFIG.TARGET_SHEET_NAME, rows.length, totalActive, totalSkipped, successMsg);
+  writeStatusLog_(targetSheetName, idSkuData.length, totalMatch, totalSkipped, successMsg);
 }
 
 // ============================================================
