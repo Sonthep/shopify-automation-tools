@@ -13,25 +13,32 @@ var STATUS_EXPORT_CONFIG = {
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('📦 Product Status Tools')
-    .addItem('🧪 0. ทดสอบดึงแค่ 10 แถวแรก (Test 10 Rows - เร็ว 0.1 วินาที)', 'test10RowsFromProductsExport')
+    .addItem('🧪 1. ทดสอบดึงแค่ 10 แถวแรก (Direct Values - 1 วินาที)', 'test10RowsFromProductsExport')
     .addSeparator()
-    .addItem('1. ดึงเฉพาะสินค้าสถานะ Active (สูตร QUERY - เร็วที่สุด 1 วินาที)', 'getActiveProductsViaQuery')
-    .addItem('2. ดึงเฉพาะสินค้าสถานะ Inactive (สูตร QUERY - เร็วที่สุด 1 วินาที)', 'getInactiveProductsViaQuery')
+    .addItem('2. ดึงสินค้า Active ทั้งหมดด้วยสูตร QUERY (1 วินาที)', 'getActiveProductsViaQuery')
+    .addItem('3. ดึงสินค้า Inactive ทั้งหมดด้วยสูตร QUERY (1 วินาที)', 'getInactiveProductsViaQuery')
     .addSeparator()
-    .addItem('3. แปลงสูตรใน Sheet ปัจจุบันเป็นข้อความปกติ (Freeze Values)', 'convertFormulasToValues')
+    .addItem('4. แปลงสูตรใน Sheet ปัจจุบันเป็นข้อความปกติ (Freeze Values)', 'convertFormulasToValues')
     .addToUi();
 }
 
 // ============================================================
-// TEST FUNCTION: ดึงเฉพาะ 10 แถวแรก (ทดสอบระบบ)
+// MAIN FUNCTION (ดึง 10 แถวแรกทันทีแบบ Direct Values)
 // ============================================================
 
 /**
+ * ดึงสินค้าสถานะ ACTIVE 10 แถวแรกทันทีลงใน Sheet "Active Products"
+ */
+function getStatusFromProductsExport() {
+  test10RowsFromProductsExport();
+}
+
+/**
  * ทดสอบดึงข้อมูลเฉพาะ 10 แถวแรกที่มีสถานะ ACTIVE จาก Products Export
- * อ่านข้อมูลเพียง 50 แถวแรกจากต้นทาง ทำให้ประมวลผลเสร็จใน 0.05 วินาที!
+ * อ่านข้อมูลเพียง 50 แถวแรกจากต้นทาง ทำให้ประมวลผลเสร็จใน 1 วินาที!
  */
 function test10RowsFromProductsExport() {
-  Logger.log("=== เริ่มทดสอบดึงข้อมูลเฉพาะ 10 แถวแรก ===");
+  Logger.log("=== เริ่มทดสอบดึงข้อมูลเฉพาะ 10 แถวแรก (Direct Values) ===");
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   
   let sourceSheet = ss.getSheetByName(STATUS_EXPORT_CONFIG.SOURCE_SHEET_NAME);
@@ -50,7 +57,7 @@ function test10RowsFromProductsExport() {
     return;
   }
   
-  // อ่านเฉพาะ 50 แถวแรกจากต้นทางเพื่อคัดเลือก 10 แถวแรก (ทำงานเสร็จใน 0.05 วินาที!)
+  // อ่านเฉพาะ 50 แถวแรกจากต้นทางเพื่อคัดเลือก 10 แถวแรก (ทำงานเสร็จใน 1 วินาที!)
   const idSkuData = sourceSheet.getRange(2, 1, 50, 4).getValues();
   const statusData = sourceSheet.getRange(2, 12, 50, 1).getValues();
   
@@ -64,13 +71,13 @@ function test10RowsFromProductsExport() {
       const rowId = idSkuData[i];
       rows.push([rowId[0], rowId[1], rowId[2], rowId[3], "ACTIVE"]);
       count++;
-      if (count >= 10) break; // ครบ 10 รายการแล้วหยุด
+      if (count >= 10) break;
     }
   }
   
-  let targetSheet = ss.getSheetByName("Test_10_Rows");
+  let targetSheet = ss.getSheetByName("Active Products");
   if (!targetSheet) {
-    targetSheet = ss.insertSheet("Test_10_Rows");
+    targetSheet = ss.insertSheet("Active Products");
   } else {
     targetSheet.clear();
   }
@@ -79,44 +86,21 @@ function test10RowsFromProductsExport() {
   targetSheet.getRange(1, 1, 1, 5).setFontWeight("bold");
   targetSheet.setFrozenRows(1);
   
-  Logger.log(`✅ [TEST SUCCESS] ดึงข้อมูลทดสอบสำเร็จ ${count} รายการ ลงใน Sheet "Test_10_Rows"`);
+  Logger.log(`✅ [SUCCESS] ดึงข้อมูลทดสอบสำเร็จ ${count} รายการ เขียนลงใน Sheet "Active Products" เรียบร้อยแล้ว!`);
 }
 
-// ============================================================
-// MAIN FUNCTIONS
-// ============================================================
-
-/**
- * ดึงสินค้าสถานะ ACTIVE (ฟังก์ชั่นเดิมเพื่อรองรับการเรียกใช้)
- */
-function getStatusFromProductsExport() {
-  getActiveProductsViaQuery();
-}
-
-/**
- * ดึงสินค้าสถานะ INACTIVE (ฟังก์ชั่นเดิมเพื่อรองรับการเรียกใช้)
- */
 function getInactiveStatusFromProductsExport() {
   getInactiveProductsViaQuery();
 }
 
-/**
- * ดึงสินค้าสถานะ ACTIVE ด้วยสูตร QUERY(IMPORTRANGE) ทำงานเสร็จใน 1 วินาที!
- */
 function getActiveProductsViaQuery() {
   applyQueryFormula_("Active Products", "WHERE Upper(Col12) = 'ACTIVE'");
 }
 
-/**
- * ดึงสินค้าสถานะ INACTIVE / DRAFT ด้วยสูตร QUERY(IMPORTRANGE) ทำงานเสร็จใน 1 วินาที!
- */
 function getInactiveProductsViaQuery() {
   applyQueryFormula_("Inactive", "WHERE Upper(Col12) <> 'ACTIVE'");
 }
 
-/**
- * ใส่สูตร QUERY + IMPORTRANGE ในเซลล์ A1 ของ Sheet ที่กำหนด
- */
 function applyQueryFormula_(targetSheetName, whereClause) {
   Logger.log(`=== เริ่มใส่สูตร QUERY ดึงสินค้า [${targetSheetName}] ===`);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -131,18 +115,14 @@ function applyQueryFormula_(targetSheetName, whereClause) {
   const sourceId = STATUS_EXPORT_CONFIG.SOURCE_SPREADSHEET_ID;
   const sourceSheetName = STATUS_EXPORT_CONFIG.SOURCE_SHEET_NAME;
   
-  // สูตร QUERY IMPORTRANGE ดึง Col 1(custom.good_id), Col 2(Variant SKU), Col 3(Product GID), Col 4(Variant GID), Col 12(Status)
   const formula = `=QUERY(IMPORTRANGE("${sourceId}", "${sourceSheetName}!A:L"), "SELECT Col1, Col2, Col3, Col4, Col12 ${whereClause}", 1)`;
   
   targetSheet.getRange("A1").setFormula(formula);
   SpreadsheetApp.flush();
   
-  Logger.log(`✅ ใส่สูตรลงใน Sheet "${targetSheetName}" เซลล์ A1 เรียบร้อยแล้ว!`);
+  Logger.log(`✅ ใส่สูตรลงใน Sheet "${targetSheetName}" เซลล์ A1 เรียบร้อยแล้ว! (หากขึ้น #REF! ให้กด "อนุญาตการเข้าถึง" ที่เซลล์ A1)`);
 }
 
-/**
- * แปลงสูตรใน Sheet ปัจจุบันเป็นค่าข้อความปกติ (เพื่อไม่ให้สูตรคำนวณซ้ำ)
- */
 function convertFormulasToValues() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getActiveSheet();
