@@ -39,7 +39,7 @@ function getInactiveStatusFromProductsExport() {
 }
 
 // ============================================================
-// CORE PROCESSING LOGIC (Fast Range Fetching - Skip Body HTML)
+// CORE PROCESSING LOGIC (Fast Range Fetching & Chunk Writing)
 // ============================================================
 
 function processStatusFilter_(targetStatusMode, targetSheetName) {
@@ -94,7 +94,6 @@ function processStatusFilter_(targetStatusMode, targetSheetName) {
   Logger.log(`📌 ดึงข้อมูลเฉพาะคอลัมน์ ID/SKU (Col 1-4) และ Status (Col ${colStatus}) - ข้ามคอลัมน์ HTML หนักๆ`);
   
   // 3. ดึงเฉพาะ 2 ช่วงข้อมูล: คอลัมน์ A-D (1-4) และ คอลัมน์ Status (12)
-  // วิธีนี้ข้ามคอลัมน์ Body (HTML) ทำให้ขนาดข้อมูลลดลง 98% และอ่านเสร็จใน 1-2 วินาที!
   const idSkuData = sourceSheet.getRange(2, 1, lastRow - 1, 4).getValues();
   const statusData = sourceSheet.getRange(2, colStatus, lastRow - 1, 1).getValues();
   
@@ -113,7 +112,6 @@ function processStatusFilter_(targetStatusMode, targetSheetName) {
     if (targetModeUpper === "ACTIVE") {
       isMatch = (statusVal === "ACTIVE" || statusVal === "TRUE");
     } else {
-      // INACTIVE / DRAFT / ARCHIVED / FALSE / BLANK
       isMatch = (statusVal !== "ACTIVE" && statusVal !== "TRUE");
     }
     
@@ -154,9 +152,17 @@ function processStatusFilter_(targetStatusMode, targetSheetName) {
   
   if (currentRows < numRows) {
     targetSheet.insertRowsAfter(currentRows, numRows - currentRows);
+  } else if (currentRows > numRows) {
+    targetSheet.deleteRows(numRows + 1, currentRows - numRows);
   }
   
-  targetSheet.getRange(1, 1, numRows, numCols).setValues(matchedRows);
+  // เขียนข้อมูลแบบแบ่ง Chunk ละ 5,000 แถว ป้องกัน Apps Script RPC Payload Lock (Exception: Document is missing)
+  const WRITE_CHUNK_SIZE = 5000;
+  for (let i = 0; i < numRows; i += WRITE_CHUNK_SIZE) {
+    const chunk = matchedRows.slice(i, i + WRITE_CHUNK_SIZE);
+    targetSheet.getRange(i + 1, 1, chunk.length, numCols).setValues(chunk);
+  }
+  
   targetSheet.getRange(1, 1, 1, numCols).setFontWeight("bold");
   targetSheet.setFrozenRows(1);
   
