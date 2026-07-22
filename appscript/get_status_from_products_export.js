@@ -99,10 +99,9 @@ function updateStatusDraftFromWinspeed() {
     }
   }));
   
-  const bulkResult = runShopifyBulkMutation_(
-    jsonlLines,
-    "mutationCall: \"productUpdate(input: $input)\""
-  );
+  const productUpdateMutation = "mutation productUpdate($input: ProductInput!) { productUpdate(input: $input) { product { id status } userErrors { field message } } }";
+  
+  const bulkResult = runShopifyBulkMutation_(jsonlLines, productUpdateMutation);
   
   if (bulkResult && bulkResult.success) {
     const successMsg = `⚡ [SUCCESS] อัปเดตสินค้าสถานะเป็น DRAFT บน Shopify สำเร็จ ${targetGids.length} รายการ (เนื่องจาก status winspeed = 'I')`;
@@ -292,7 +291,7 @@ function fetchProductsDirectFromShopify_(statusQuery, targetSheetName) {
 // SHOPIFY BULK MUTATION RUNNER (stagedUploadsCreate + bulkOperationRunMutation)
 // ============================================================
 
-function runShopifyBulkMutation_(jsonlLines, mutationCallSignature) {
+function runShopifyBulkMutation_(jsonlLines, mutationQueryString) {
   const jsonlData = jsonlLines.join("\n");
   
   const stageMutation = `mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
@@ -342,7 +341,7 @@ function runShopifyBulkMutation_(jsonlLines, mutationCallSignature) {
   }`;
 
   const runVars = {
-    mutation: `${mutationCallSignature} { product { id status } userErrors { field message } }`,
+    mutation: mutationQueryString,
     stagedUploadPath: stagedPath
   };
 
