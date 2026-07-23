@@ -387,44 +387,57 @@ function downloadAndProcessJSONL_(url) {
   Logger.log(`  ${allRowsData.length} variant rows assembled.`);
   
   // ---------------------------------------------------------
-  // เขียนลง Sheet
+  // เขียนลง Sheet (ใช้ Lock ป้องกันสคริปต์ชนกัน)
   // ---------------------------------------------------------
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(EXPORT_SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(EXPORT_SHEET_NAME);
-  } else {
-    sheet.clearContents(); // ใช้ clearContents() เพื่อรักษาโครงสร้างแถวเดิม ไม่ต้องเสียเวลาลบ/สร้างใหม่ 40,000 แถว
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(60000); // รอได้สูงสุด 60 วินาที
+  } catch (e) {
+    Logger.log("❌ Could not acquire lock: " + e.toString());
+    throw new Error("Spreadsheet is currently locked by another run. Please try again later.");
   }
   
-  const targetRows = finalRows2D.length;
-  const targetCols = finalHeaders.length;
-  
-  const currentRows = sheet.getMaxRows();
-  const currentCols = sheet.getMaxColumns();
-  
-  // ปรับจํานวนคอลัมน์ให้พอดี
-  if (currentCols < targetCols) {
-    sheet.insertColumnsAfter(currentCols, targetCols - currentCols);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(EXPORT_SHEET_NAME);
+    if (!sheet) {
+      sheet = ss.insertSheet(EXPORT_SHEET_NAME);
+    } else {
+      const lastR = sheet.getLastRow();
+      const lastC = sheet.getLastColumn();
+      if (lastR > 0 && lastC > 0) {
+        sheet.getRange(1, 1, lastR, lastC).clearContent();
+      }
+    }
+    
+    const targetRows = finalRows2D.length;
+    const targetCols = finalHeaders.length;
+    
+    const currentRows = sheet.getMaxRows();
+    const currentCols = sheet.getMaxColumns();
+    
+    if (currentCols < targetCols) {
+      sheet.insertColumnsAfter(currentCols, targetCols - currentCols);
+    }
+    
+    if (currentRows < targetRows) {
+      sheet.insertRowsAfter(currentRows, targetRows - currentRows);
+    }
+    
+    sheet.setRowHeight(1, 25);
+    
+    // Write everything in a single fast call
+    sheet.getRange(1, 1, targetRows, targetCols).setValues(finalRows2D);
+    
+    // 3. จัดรูปแบบหัวตาราง
+    sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
+    sheet.getRange(1, 1, 1, targetCols).setWrap(false);
+    sheet.setFrozenRows(1);
+    
+    Logger.log(`✅ ${allRowsData.length} products exported to sheet '${EXPORT_SHEET_NAME}'`);
+  } finally {
+    lock.releaseLock();
   }
-  
-  // ปรับจํานวนแถวเฉพาะกรณีที่แถวเดิมไม่พอ
-  if (currentRows < targetRows) {
-    sheet.insertRowsAfter(currentRows, targetRows - currentRows);
-    SpreadsheetApp.flush(); // ยืนยันการขยายแถวก่อนเริ่มเขียนข้อมูล
-  }
-  
-  sheet.setRowHeight(1, 25);
-  
-  // Write everything in a single fast call
-  sheet.getRange(1, 1, targetRows, targetCols).setValues(finalRows2D);
-  
-  // 3. จัดรูปแบบหัวตาราง
-  sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
-  sheet.getRange(1, 1, 1, targetCols).setWrap(false);
-  sheet.setFrozenRows(1);
-  
-  Logger.log(`✅ ${allRowsData.length} products exported to sheet '${EXPORT_SHEET_NAME}'`);
 }
 
 // ============================================================
@@ -567,6 +580,13 @@ function showAlert_(message) {
 // WEBHOOK ENDPOINT FOR PYTHON (ไม่ต้องใช้ Google Cloud / บัตรเครดิต)
 // ============================================================
 function doPost(e) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(60000); // รอได้สูงสุด 60 วินาที
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Spreadsheet is locked: " + err.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
+  
   try {
     const contents = JSON.parse(e.postData.contents);
     const rows = contents.rows;
@@ -613,5 +633,7 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({ status: "success", count: targetRows - 1 })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
   }
 }
