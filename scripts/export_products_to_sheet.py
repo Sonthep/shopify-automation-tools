@@ -260,23 +260,46 @@ def update_google_sheet(rows_2d):
     webapp_url = os.getenv("WEBAPP_URL") or os.getenv("APPS_SCRIPT_WEBAPP_URL")
     
     if webapp_url:
-        print("🌐 Sending data to Google Apps Script WebApp (No Credit Card / No GCP Required)...")
-        res = requests.post(webapp_url, json={"rows": rows_2d}, timeout=120)
-        if res.status_code == 200:
-            try:
-                res_data = res.json()
-                if res_data.get("status") == "success":
-                    print(f"✅ Successfully exported {res_data.get('count')} products to Google Sheet!")
-                    return
-                else:
-                    print(f"❌ Apps Script error: {res_data.get('message')}")
-                    sys.exit(1)
-            except Exception as e:
-                print(f"✅ Data sent to Apps Script (Response: {res.text[:100]})")
-                return
-        else:
-            print(f"❌ Failed HTTP {res.status_code}: {res.text[:200]}")
-            sys.exit(1)
+        print("🌐 Sending data to Google Apps Script WebApp in chunks to prevent timeout...")
+        CHUNK_SIZE = 3000
+        total_rows = len(rows_2d)
+        total_chunks = (total_rows + CHUNK_SIZE - 1) // CHUNK_SIZE
+        
+        for i in range(0, total_rows, CHUNK_SIZE):
+            chunk_rows = rows_2d[i : i + CHUNK_SIZE]
+            action = "overwrite" if i == 0 else "append"
+            chunk_num = (i // CHUNK_SIZE) + 1
+            
+            print(f"  📤 Sending chunk {chunk_num}/{total_chunks} ({len(chunk_rows)} rows)...")
+            
+            for attempt in range(3):
+                try:
+                    res = requests.post(
+                        webapp_url,
+                        json={"rows": chunk_rows, "action": action},
+                        timeout=120
+                    )
+                    if res.status_code == 200:
+                        try:
+                            res_data = res.json()
+                            if res_data.get("status") == "success":
+                                break
+                            else:
+                                print(f"  ❌ Apps script error: {res_data.get('message')}")
+                        except Exception:
+                            print(f"  ✅ Chunk {chunk_num} sent successfully.")
+                            break
+                    else:
+                        print(f"  ❌ Failed HTTP {res.status_code}: {res.text[:100]}")
+                except Exception as e:
+                    print(f"  ⚠️ Chunk {chunk_num} attempt {attempt + 1}/3 timed out: {e}")
+                    time.sleep(3)
+            else:
+                print(f"❌ Failed to send chunk {chunk_num} to Apps Script after 3 attempts.")
+                sys.exit(1)
+
+        print(f"✅ Successfully exported {total_rows - 1} products to Google Sheet!")
+        return
 
     sheet_id = os.getenv("GOOGLE_SHEET_ID")
     sheet_name = os.getenv("EXPORT_SHEET_NAME", "Products Export")
