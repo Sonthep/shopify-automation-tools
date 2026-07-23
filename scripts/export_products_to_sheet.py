@@ -260,8 +260,8 @@ def update_google_sheet(rows_2d):
     webapp_url = os.getenv("WEBAPP_URL") or os.getenv("APPS_SCRIPT_WEBAPP_URL")
     
     if webapp_url:
-        print("🌐 Sending data to Google Apps Script WebApp in 1,000-row chunks...")
-        CHUNK_SIZE = 1000
+        print("🌐 Sending data to Google Apps Script WebApp in 5,000-row chunks...")
+        CHUNK_SIZE = 5000
         total_rows = len(rows_2d)
         total_chunks = (total_rows + CHUNK_SIZE - 1) // CHUNK_SIZE
         
@@ -297,8 +297,6 @@ def update_google_sheet(rows_2d):
             else:
                 print(f"❌ Failed to send chunk {chunk_num} to Apps Script after 3 attempts.")
                 sys.exit(1)
-
-            time.sleep(0.5)
 
         print(f"✅ Successfully exported {total_rows - 1} products to Google Sheet!")
         return
