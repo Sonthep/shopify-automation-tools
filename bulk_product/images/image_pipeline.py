@@ -109,7 +109,7 @@ root.geometry("700x460")
 frm_sel = tk.Frame(root)
 frm_sel.pack(fill="x", padx=12, pady=(12, 6))
 
-src_var = tk.StringVar(value=r"C:\Users\0125024\Documents\shoptify\download\images")
+src_var = tk.StringVar(value=r"U:\25.WEBSITE\Sp_Website\รูปภาพอะไหล่ 09-07-69\รูปภาพอะไหล่ 09-07-69")
 
 def pick_src():
     p = filedialog.askdirectory(title="📂 เลือกโฟลเดอร์ต้นทาง")

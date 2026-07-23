@@ -86,3 +86,16 @@ menu-importer/output/
 # bulk_product data
 bulk_product/products/output/
 *.jsonl
+*.inspect.ndjson
+
+# PDF backups and large data
+Found_PDFs/
+Found_PDFs_Backup.zip
+Web_Ready_PDFs/
+.artifact_work/
+bulk_product/collections/scratch_check_col.py
+bulk_product/data/outputs/
+not upload complete/
+success_skus.txt
+
+
