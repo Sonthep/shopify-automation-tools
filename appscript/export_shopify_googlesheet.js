@@ -416,13 +416,8 @@ function downloadAndProcessJSONL_(url) {
   
   sheet.setRowHeight(1, 25);
   
-  // เขียนข้อมูลลงในชีตแบบแบ่ง Chunk ขนาดพอดี (ทีละ 2,000 แถว / 34,000 เซลล์) เพื่อไม่ให้เกิน Limit ของ Google Sheets API
-  const WRITE_BATCH_SIZE = 2000;
-  for (let i = 0; i < targetRows; i += WRITE_BATCH_SIZE) {
-    const chunk = finalRows2D.slice(i, i + WRITE_BATCH_SIZE);
-    sheet.getRange(i + 1, 1, chunk.length, targetCols).setValues(chunk);
-    SpreadsheetApp.flush(); // บังคับส่งข้อมูลในแต่ละ 2,000 แถวทันที
-  }
+  // Write everything in a single fast call
+  sheet.getRange(1, 1, targetRows, targetCols).setValues(finalRows2D);
   
   // 3. จัดรูปแบบหัวตาราง
   sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
@@ -575,7 +570,6 @@ function doPost(e) {
   try {
     const contents = JSON.parse(e.postData.contents);
     const rows = contents.rows;
-    const action = contents.action || "overwrite"; // "overwrite" or "append"
     if (!rows || !rows.length) {
       return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "No rows provided" })).setMimeType(ContentService.MimeType.JSON);
     }
@@ -584,15 +578,15 @@ function doPost(e) {
     let sheet = ss.getSheetByName(EXPORT_SHEET_NAME);
     if (!sheet) {
       sheet = ss.insertSheet(EXPORT_SHEET_NAME);
-    } else if (action === "overwrite") {
-      const lastR = sheet.getLastRow();
-      const lastC = sheet.getLastColumn();
-      if (lastR > 0 && lastC > 0) {
-        sheet.getRange(1, 1, lastR, lastC).clearContent();
-      }
     }
     
-    const startRow = (action === "append") ? Math.max(1, sheet.getLastRow() + 1) : 1;
+    // Clear content of existing data range quickly
+    const lastR = sheet.getLastRow();
+    const lastC = sheet.getLastColumn();
+    if (lastR > 0 && lastC > 0) {
+      sheet.getRange(1, 1, lastR, lastC).clearContent();
+    }
+    
     const targetRows = rows.length;
     const targetCols = rows[0].length;
     
@@ -603,21 +597,20 @@ function doPost(e) {
       sheet.insertColumnsAfter(currentCols, targetCols - currentCols);
     }
     
-    const neededRows = startRow + targetRows - 1;
-    if (currentRows < neededRows) {
-      sheet.insertRowsAfter(currentRows, neededRows - currentRows);
+    if (currentRows < targetRows) {
+      sheet.insertRowsAfter(currentRows, targetRows - currentRows);
     }
     
-    // Write range directly without repetitive SpreadsheetApp.flush()
-    sheet.getRange(startRow, 1, targetRows, targetCols).setValues(rows);
+    sheet.setRowHeight(1, 25);
     
-    if (action === "overwrite") {
-      sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
-      sheet.getRange(1, 1, 1, targetCols).setWrap(false);
-      sheet.setFrozenRows(1);
-    }
+    // Write everything in a single fast call
+    sheet.getRange(1, 1, targetRows, targetCols).setValues(rows);
     
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", count: targetRows })).setMimeType(ContentService.MimeType.JSON);
+    sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
+    sheet.getRange(1, 1, 1, targetCols).setWrap(false);
+    sheet.setFrozenRows(1);
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", count: targetRows - 1 })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
   }
