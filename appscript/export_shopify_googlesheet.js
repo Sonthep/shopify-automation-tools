@@ -575,6 +575,7 @@ function doPost(e) {
   try {
     const contents = JSON.parse(e.postData.contents);
     const rows = contents.rows;
+    const action = contents.action || "overwrite"; // "overwrite" or "append"
     if (!rows || !rows.length) {
       return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "No rows provided" })).setMimeType(ContentService.MimeType.JSON);
     }
@@ -583,10 +584,11 @@ function doPost(e) {
     let sheet = ss.getSheetByName(EXPORT_SHEET_NAME);
     if (!sheet) {
       sheet = ss.insertSheet(EXPORT_SHEET_NAME);
-    } else {
+    } else if (action === "overwrite") {
       sheet.clearContents();
     }
     
+    const startRow = (action === "append") ? Math.max(1, sheet.getLastRow() + 1) : 1;
     const targetRows = rows.length;
     const targetCols = rows[0].length;
     
@@ -596,25 +598,24 @@ function doPost(e) {
     if (currentCols < targetCols) {
       sheet.insertColumnsAfter(currentCols, targetCols - currentCols);
     }
-    if (currentRows < targetRows) {
-      sheet.insertRowsAfter(currentRows, targetRows - currentRows);
-      SpreadsheetApp.flush();
+    
+    const neededRows = startRow + targetRows - 1;
+    if (currentRows < neededRows) {
+      sheet.insertRowsAfter(currentRows, neededRows - currentRows);
     }
     
     sheet.setRowHeight(1, 25);
     
-    const WRITE_BATCH_SIZE = 5000;
-    for (let i = 0; i < targetRows; i += WRITE_BATCH_SIZE) {
-      const chunk = rows.slice(i, i + WRITE_BATCH_SIZE);
-      sheet.getRange(i + 1, 1, chunk.length, targetCols).setValues(chunk);
-      SpreadsheetApp.flush();
+    // Write range directly without repetitive SpreadsheetApp.flush()
+    sheet.getRange(startRow, 1, targetRows, targetCols).setValues(rows);
+    
+    if (action === "overwrite") {
+      sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
+      sheet.getRange(1, 1, 1, targetCols).setWrap(false);
+      sheet.setFrozenRows(1);
     }
     
-    sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
-    sheet.getRange(1, 1, 1, targetCols).setWrap(false);
-    sheet.setFrozenRows(1);
-    
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", count: targetRows - 1 })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", count: targetRows })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
   }

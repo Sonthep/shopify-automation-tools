@@ -260,8 +260,8 @@ def update_google_sheet(rows_2d):
     webapp_url = os.getenv("WEBAPP_URL") or os.getenv("APPS_SCRIPT_WEBAPP_URL")
     
     if webapp_url:
-        print("🌐 Sending data to Google Apps Script WebApp in chunks to prevent timeout...")
-        CHUNK_SIZE = 3000
+        print("🌐 Sending data to Google Apps Script WebApp in 1,000-row chunks...")
+        CHUNK_SIZE = 1000
         total_rows = len(rows_2d)
         total_chunks = (total_rows + CHUNK_SIZE - 1) // CHUNK_SIZE
         
@@ -277,7 +277,7 @@ def update_google_sheet(rows_2d):
                     res = requests.post(
                         webapp_url,
                         json={"rows": chunk_rows, "action": action},
-                        timeout=120
+                        timeout=60
                     )
                     if res.status_code == 200:
                         try:
@@ -293,10 +293,12 @@ def update_google_sheet(rows_2d):
                         print(f"  ❌ Failed HTTP {res.status_code}: {res.text[:100]}")
                 except Exception as e:
                     print(f"  ⚠️ Chunk {chunk_num} attempt {attempt + 1}/3 timed out: {e}")
-                    time.sleep(3)
+                    time.sleep(2)
             else:
                 print(f"❌ Failed to send chunk {chunk_num} to Apps Script after 3 attempts.")
                 sys.exit(1)
+
+            time.sleep(0.5)
 
         print(f"✅ Successfully exported {total_rows - 1} products to Google Sheet!")
         return
