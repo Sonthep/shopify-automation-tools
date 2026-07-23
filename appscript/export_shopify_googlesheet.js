@@ -252,16 +252,21 @@ function downloadAndProcessJSONL_(url) {
     let validBytes = bytes;
     let nextStart = startByte + bytes.length;
     
-    // ถ้าเซิร์ฟเวอร์คืนค่ามาเป็น Partial Content (206) และเราได้มาเต็ม Chunk ขนาด 5MB
-    if (code === 206 && bytes.length === CHUNK_SIZE) {
-      // หาตำแหน่ง \n (Byte 10) ตัวสุดท้าย เพื่อตัดบรรทัดไม่ให้ JSON ขาดครึ่ง
-      const lastNewlineIndex = bytes.lastIndexOf(10);
-      if (lastNewlineIndex !== -1) {
-        validBytes = bytes.slice(0, lastNewlineIndex + 1);
-        nextStart = startByte + lastNewlineIndex + 1; // ยกยอด Byte ที่เหลือไปโหลดในรอบถัดไป
+    if (code === 206) {
+      if (bytes.length < CHUNK_SIZE) {
+        // ขนาดก้อนข้อมูลเล็กกว่า CHUNK_SIZE แปลว่าถึงปลายไฟล์ (Chunk สุดท้าย) แล้ว
+        isDone = true;
+        validBytes = bytes;
+      } else {
+        // ได้ก้อนข้อมูลขนาดเต็ม 5MB ให้หาตำแหน่ง \n ตัวสุดท้าย
+        const lastNewlineIndex = bytes.lastIndexOf(10);
+        if (lastNewlineIndex !== -1) {
+          validBytes = bytes.slice(0, lastNewlineIndex + 1);
+          nextStart = startByte + lastNewlineIndex + 1; // ยกยอด Byte ที่เหลือไปโหลดในรอบถัดไป
+        }
       }
     } else {
-      // ถ้าเป็น 200 (เซิร์ฟเวอร์ส่งไฟล์เต็มมาเลย) หรือเป็น Chunk สุดท้าย
+      // ถ้าเป็น 200 (เซิร์ฟเวอร์ส่งไฟล์เต็มมาเลย) ให้ถือเป็นรอบสุดท้าย
       isDone = true;
     }
     
