@@ -20,12 +20,12 @@ def generate_token(env_path: str = ENV_PATH) -> str | None:
     client_id = os.getenv("SHOPIFY_CLIENT_ID")
     client_secret = os.getenv("SHOPIFY_CLIENT_SECRET")
     
-    if not client_id or not client_secret or client_id.startswith("x") or client_secret.startswith("shpss_x"):
-        print("❌ Error: SHOPIFY_CLIENT_ID or SHOPIFY_CLIENT_SECRET is missing or using placeholder in environment / .env")
+    if not client_id or not client_secret:
+        print("❌ Error: SHOPIFY_CLIENT_ID or SHOPIFY_CLIENT_SECRET is missing in .env")
         return None
     
     url = f"https://{shop}/admin/oauth/access_token"
-    payload = {
+    params = {
         "grant_type": "client_credentials",
         "client_id": client_id,
         "client_secret": client_secret
@@ -33,20 +33,8 @@ def generate_token(env_path: str = ENV_PATH) -> str | None:
     
     print(f"🔄 Requesting new access token from https://{shop}...")
     try:
-        # OAuth client credentials grant requires body payload
-        res = requests.post(url, json=payload, timeout=10)
-        if res.status_code != 200:
-            res = requests.post(url, data=payload, timeout=10)
-            
-        if res.status_code != 200:
-            print(f"❌ Failed to get token (HTTP {res.status_code}): {res.text[:500]}")
-            return None
-
-        try:
-            data = res.json()
-        except ValueError:
-            print(f"❌ Failed to parse JSON response (HTTP {res.status_code}): {res.text[:500]}")
-            return None
+        res = requests.post(url, params=params, timeout=10)
+        data = res.json()
     except Exception as e:
         print(f"❌ HTTP Request failed: {e}")
         return None

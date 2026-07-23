@@ -260,34 +260,22 @@ def update_google_sheet(rows_2d):
     webapp_url = os.getenv("WEBAPP_URL") or os.getenv("APPS_SCRIPT_WEBAPP_URL")
     
     if webapp_url:
-        print("🌐 Sending all data to Google Apps Script WebApp in a single request...")
-        total_rows = len(rows_2d)
-        
-        for attempt in range(3):
+        print("🌐 Sending data to Google Apps Script WebApp (No Credit Card / No GCP Required)...")
+        res = requests.post(webapp_url, json={"rows": rows_2d}, timeout=120)
+        if res.status_code == 200:
             try:
-                res = requests.post(
-                    webapp_url,
-                    json={"rows": rows_2d},
-                    timeout=180
-                )
-                if res.status_code == 200:
-                    try:
-                        res_data = res.json()
-                        if res_data.get("status") == "success":
-                            print(f"✅ Successfully exported {res_data.get('count')} products to Google Sheet!")
-                            return
-                        else:
-                            print(f"  ❌ Apps script error: {res_data.get('message')}")
-                    except Exception:
-                        print(f"✅ Data sent to Apps Script (Response: {res.text[:100]})")
-                        return
+                res_data = res.json()
+                if res_data.get("status") == "success":
+                    print(f"✅ Successfully exported {res_data.get('count')} products to Google Sheet!")
+                    return
                 else:
-                    print(f"  ❌ Failed HTTP {res.status_code}: {res.text[:100]}")
+                    print(f"❌ Apps Script error: {res_data.get('message')}")
+                    sys.exit(1)
             except Exception as e:
-                print(f"  ⚠️ Attempt {attempt + 1}/3 timed out: {e}")
-                time.sleep(5)
+                print(f"✅ Data sent to Apps Script (Response: {res.text[:100]})")
+                return
         else:
-            print("❌ Failed to send data to Apps Script after 3 attempts.")
+            print(f"❌ Failed HTTP {res.status_code}: {res.text[:200]}")
             sys.exit(1)
 
     sheet_id = os.getenv("GOOGLE_SHEET_ID")

@@ -46,16 +46,10 @@ class ShopifyClient:
 
     def _build_headers(self) -> dict:
         token = os.getenv(self.token_env)
-        if token and (token.startswith("shpat_x") or token == "xxxxxxxxxx"):
-            token = None
         if not token:
             token = self.refresh_token()
         if not token:
-            raise RuntimeError(
-                f"Could not acquire token for '{self.token_env}'.\n"
-                f"Please ensure either '{self.token_env}' or both ('SHOPIFY_CLIENT_ID' and 'SHOPIFY_CLIENT_SECRET') "
-                f"are properly set in your .env or GitHub Repository Secrets."
-            )
+            raise RuntimeError(f"Could not acquire token for '{self.token_env}'")
         return {
             "Content-Type": "application/json",
             "X-Shopify-Access-Token": token,
