@@ -426,12 +426,11 @@ function downloadAndProcessJSONL_(url) {
     
     sheet.setRowHeight(1, 25);
     
-    // ทยอยเขียนลงชีตทีละ 5,000 แถว (ไม่ใช้ flush เพื่อความเร็วสูงสุด แต่ป้องกันหน่วยความจำ Google ค้าง)
-    const WRITE_BATCH_SIZE = 5000;
-    for (let i = 0; i < targetRows; i += WRITE_BATCH_SIZE) {
-      const chunk = finalRows2D.slice(i, i + WRITE_BATCH_SIZE);
-      sheet.getRange(i + 1, 1, chunk.length, targetCols).setValues(chunk);
-    }
+    // เขียนข้อมูลโดยใช้ Advanced Sheets API (เร็วที่สุด ไม่ติด Timeout)
+    const resource = { values: finalRows2D };
+    Sheets.Spreadsheets.Values.update(resource, ss.getId(), EXPORT_SHEET_NAME + "!A1", {
+      valueInputOption: "USER_ENTERED"
+    });
     
     // 3. จัดรูปแบบหัวตาราง
     sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
@@ -627,12 +626,11 @@ function doPost(e) {
     
     sheet.setRowHeight(1, 25);
     
-    // ทยอยเขียนลงชีตทีละ 5,000 แถว (ไม่ใช้ flush เพื่อความเร็วสูงสุด แต่ป้องกันหน่วยความจำ Google ค้าง)
-    const WRITE_BATCH_SIZE = 5000;
-    for (let i = 0; i < targetRows; i += WRITE_BATCH_SIZE) {
-      const chunk = rows.slice(i, i + WRITE_BATCH_SIZE);
-      sheet.getRange(i + 1, 1, chunk.length, targetCols).setValues(chunk);
-    }
+    // เขียนข้อมูลโดยใช้ Advanced Sheets API (เร็วที่สุด ไม่ติด Timeout)
+    const resource = { values: rows };
+    Sheets.Spreadsheets.Values.update(resource, ss.getId(), EXPORT_SHEET_NAME + "!A1", {
+      valueInputOption: "USER_ENTERED"
+    });
     
     sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
     sheet.getRange(1, 1, 1, targetCols).setWrap(false);
