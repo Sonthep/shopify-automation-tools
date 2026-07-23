@@ -400,8 +400,10 @@ function downloadAndProcessJSONL_(url) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(EXPORT_SHEET_NAME);
+    let isNew = false;
     if (!sheet) {
       sheet = ss.insertSheet(EXPORT_SHEET_NAME);
+      isNew = true;
     } else {
       const lastR = sheet.getLastRow();
       const lastC = sheet.getLastColumn();
@@ -432,10 +434,12 @@ function downloadAndProcessJSONL_(url) {
       valueInputOption: "USER_ENTERED"
     });
     
-    // 3. จัดรูปแบบหัวตาราง
-    sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
-    sheet.getRange(1, 1, 1, targetCols).setWrap(false);
-    sheet.setFrozenRows(1);
+    // จัดรูปแบบเฉพาะตอนสร้างชีตใหม่เท่านั้น เพื่อป้องกันการล็อกไฟล์ชนกัน
+    if (isNew) {
+      sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
+      sheet.getRange(1, 1, 1, targetCols).setWrap(false);
+      sheet.setFrozenRows(1);
+    }
     
     Logger.log(`✅ ${allRowsData.length} products exported to sheet '${EXPORT_SHEET_NAME}'`);
   } finally {
@@ -599,8 +603,10 @@ function doPost(e) {
     
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(EXPORT_SHEET_NAME);
+    let isNew = false;
     if (!sheet) {
       sheet = ss.insertSheet(EXPORT_SHEET_NAME);
+      isNew = true;
     }
     
     // Clear content of existing data range quickly
@@ -632,9 +638,12 @@ function doPost(e) {
       valueInputOption: "USER_ENTERED"
     });
     
-    sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
-    sheet.getRange(1, 1, 1, targetCols).setWrap(false);
-    sheet.setFrozenRows(1);
+    // จัดรูปแบบเฉพาะตอนสร้างชีตใหม่เท่านั้น เพื่อป้องกันการล็อกไฟล์ชนกัน
+    if (isNew) {
+      sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
+      sheet.getRange(1, 1, 1, targetCols).setWrap(false);
+      sheet.setFrozenRows(1);
+    }
     
     return ContentService.createTextOutput(JSON.stringify({ status: "success", count: targetRows - 1 })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
