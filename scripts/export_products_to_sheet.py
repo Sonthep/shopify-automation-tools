@@ -260,8 +260,8 @@ def update_google_sheet(rows_2d):
     webapp_url = os.getenv("WEBAPP_URL") or os.getenv("APPS_SCRIPT_WEBAPP_URL")
     
     if webapp_url:
-        print("🌐 Sending data to Google Apps Script WebApp in 5,000-row chunks...")
-        CHUNK_SIZE = 5000
+        print("🌐 Sending data to Google Apps Script WebApp in 2,000-row chunks...")
+        CHUNK_SIZE = 2000
         total_rows = len(rows_2d)
         total_chunks = (total_rows + CHUNK_SIZE - 1) // CHUNK_SIZE
         
