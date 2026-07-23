@@ -1,9 +1,9 @@
 // ============================================================
 // CONFIG
 // ============================================================
-var SHOP = "sevenfive-4062.myshopify.com";
-var CLIENT_ID = "xxxxxxxxxxxxxxxxxxx";
-var CLIENT_SECRET = "xxxxxxxxxxxxxxxxxxx";
+var SHOP = PropertiesService.getScriptProperties().getProperty("SHOP") || "sevenfive-4062.myshopify.com";
+var CLIENT_ID = PropertiesService.getScriptProperties().getProperty("CLIENT_ID") || "YOUR_CLIENT_ID";
+var CLIENT_SECRET = PropertiesService.getScriptProperties().getProperty("CLIENT_SECRET") || "YOUR_CLIENT_SECRET";
 
 var EXPORT_SHEET_NAME = "Products Export";
 var POLL_INTERVAL_MS = 10000; // เช็คสถานะทุกๆ 10 วินาที
@@ -31,49 +31,51 @@ function exportProductsToSheet() {
   const props = PropertiesService.getScriptProperties();
   let opId = props.getProperty(PROP_LAST_BULK_OP_ID);
   
-  if (opId) {
-    Logger.log("Found existing bulk operation: " + opId);
-  } else {
-    // เช็คว่ามี Bulk Query อื่นที่กำลังทำงานบน Shopify หรือไม่
-    Logger.log("Checking current bulk operation status...");
-    const checkQuery = `{ currentBulkOperation(type: QUERY) { id status url } }`;
-    const checkRes = callGraphQL_({ query: checkQuery });
-    const currentOp = (checkRes && checkRes.data) ? checkRes.data.currentBulkOperation : null;
-    
-    if (currentOp && (currentOp.status === "RUNNING" || currentOp.status === "CREATED")) {
-      opId = currentOp.id;
-      props.setProperty(PROP_LAST_BULK_OP_ID, opId);
-      Logger.log("Adopted active bulk operation: " + opId);
-    } else {
-      // เริ่มการสร้าง Bulk Query ใหม่
-      Logger.log("Starting a new bulk query...");
-      opId = startBulkQuery_();
-      if (!opId) {
-        showAlert_("❌ ไม่สามารถเริ่มการดึงข้อมูลได้ โปรดตรวจสอบ Log");
-        return;
-      }
-      props.setProperty(PROP_LAST_BULK_OP_ID, opId);
-      Logger.log("New bulk operation started: " + opId);
-    }
+  // เช็คสถานะปัจจุบันของ Bulk Operation บน Shopify ก่อนเสมอ
+  Logger.log("Checking current bulk operation status on Shopify...");
+  const checkQuery = `{ currentBulkOperation(type: QUERY) { id status url } }`;
+  const checkRes = callGraphQL_({ query: checkQuery });
+  const currentOp = (checkRes && checkRes.data) ? checkRes.data.currentBulkOperation : null;
+  
+  // 1. ถ้ามี Bulk Query ที่เตรียมเสร็จเรียบร้อยแล้ว (COMPLETED) ให้ดาวน์โหลดได้ทันที โดยไม่ต้องสั่งทำใหม่
+  if (currentOp && currentOp.status === "COMPLETED" && currentOp.url) {
+    Logger.log("Found completed bulk operation: " + currentOp.id);
+    downloadAndProcessJSONL_(currentOp.url);
+    props.deleteProperty(PROP_LAST_BULK_OP_ID);
+    showAlert_("✅ ดึงข้อมูลสินค้าและเขียนลงชีตเรียบร้อยแล้ว!");
+    return;
   }
   
-  // ตรวจสอบสถานะและรอชั่วคราว (สูงสุดประมาณ 45 วินาที) เพื่อไม่ให้ Apps Script เกิน 6 นาที
+  if (opId) {
+    Logger.log("Found existing bulk operation ID: " + opId);
+  } else if (currentOp && (currentOp.status === "RUNNING" || currentOp.status === "CREATED")) {
+    opId = currentOp.id;
+    props.setProperty(PROP_LAST_BULK_OP_ID, opId);
+    Logger.log("Adopted active bulk operation: " + opId);
+  } else {
+    // เริ่มการสร้าง Bulk Query ใหม่
+    Logger.log("Starting a new bulk query...");
+    opId = startBulkQuery_();
+    if (!opId) {
+      showAlert_("❌ ไม่สามารถเริ่มการดึงข้อมูลได้ โปรดตรวจสอบ Log");
+      return;
+    }
+    props.setProperty(PROP_LAST_BULK_OP_ID, opId);
+    Logger.log("New bulk operation started: " + opId);
+  }
+  
+  // 2. ตรวจสอบสถานะและรอประมวลผล
   const result = pollStatus_(opId);
   
   if (result.status === "COMPLETED") {
-    props.deleteProperty(PROP_LAST_BULK_OP_ID);
     downloadAndProcessJSONL_(result.url);
+    props.deleteProperty(PROP_LAST_BULK_OP_ID); // ลบออกเมื่อทำงานเสร็จสมบูรณ์แล้วเท่านั้น
     showAlert_("✅ ดึงข้อมูลสินค้าและเขียนลงชีตเรียบร้อยแล้ว!");
   } else if (result.status === "RUNNING" || result.status === "CREATED") {
-    showAlert_(
-      "⏳ ข้อมูลกำลังจัดเตรียมอยู่บน Shopify...\n\n" +
-      "เนื่องจากข้อมูลมีขนาดใหญ่ ระบบได้สั่งให้จัดเตรียมข้อมูลไว้แล้ว\n" +
-      "กรุณารอ 1-2 นาที แล้วกดเลือกเมนู '1. Export Products to Sheet' อีกครั้งเพื่อทำการดาวน์โหลดลงชีต"
-    );
+    showAlert_("⏳ ข้อมูลกำลังจัดเตรียมอยู่บน Shopify...");
   } else {
-    // ล้มเหลวหรือถูกยกเลิก (FAILED, CANCELED, หรือหักล้างข้อมูลไม่พบ)
     props.deleteProperty(PROP_LAST_BULK_OP_ID);
-    showAlert_("❌ การประมวลผลบน Shopify ล้มเหลว (สถานะ: " + result.status + ")\nระบบได้ล้างคำสั่งเดิมแล้ว โปรดกดรันอีกครั้งเพื่อเริ่มทำรายการใหม่");
+    showAlert_("❌ การประมวลผลบน Shopify ล้มเหลว (สถานะ: " + result.status + ")");
   }
 }
 
@@ -89,15 +91,11 @@ function startBulkQuery_() {
         id
         handle
         title
-        description
-        descriptionHtml
         vendor
         productType
         tags
         status
         publishedAt
-        seo { title description }
-        category { name fullName }
         variants {
           edges {
             node {
@@ -185,7 +183,7 @@ function pollStatus_(bulkOperationId) {
   };
   
   const startTime = Date.now();
-  const maxPollTimeMs = 45000; // รอเช็คสถานะสูงสุด 45 วินาทีต่อการกดหนึ่งครั้ง
+  const maxPollTimeMs = 300000; // รอเช็คสถานะสูงสุด 5 นาทีจนกว่า Shopify จะจัดเตรียมข้อมูลเสร็จ
   
   while (true) {
     const res = callGraphQL_(payload);
@@ -304,7 +302,7 @@ function downloadAndProcessJSONL_(url) {
   Logger.log(`  ${totalLinesParsed} lines downloaded and parsed.`);
   
   // ---------------------------------------------------------
-  // จัดเตรียมข้อมูลลง Google Sheet (เฉพาะ 18 Columns ที่กำหนด)
+  // จัดเตรียมข้อมูลลง Google Sheet (เฉพาะ 17 Columns ที่กำหนด)
   // ---------------------------------------------------------
   const finalHeaders = [
     "custom.good_id",
@@ -314,7 +312,6 @@ function downloadAndProcessJSONL_(url) {
     "Inventory Item ID",
     "Handle",
     "Title",
-    "Body (HTML)",
     "Vendor",
     "Type",
     "Tags",
@@ -347,7 +344,6 @@ function downloadAndProcessJSONL_(url) {
         "Inventory Item ID": inv,
         "Handle": p.handle || "",
         "Title": p.title || "",
-        "Body (HTML)": p.descriptionHtml || "",
         "Vendor": p.vendor || "",
         "Type": p.productType || "",
         "Tags": (p.tags || []).join(", "),
@@ -398,7 +394,7 @@ function downloadAndProcessJSONL_(url) {
   if (!sheet) {
     sheet = ss.insertSheet(EXPORT_SHEET_NAME);
   } else {
-    sheet.clear();
+    sheet.clearContents(); // ใช้ clearContents() เพื่อรักษาโครงสร้างแถวเดิม ไม่ต้องเสียเวลาลบ/สร้างใหม่ 40,000 แถว
   }
   
   const targetRows = finalRows2D.length;
@@ -407,34 +403,30 @@ function downloadAndProcessJSONL_(url) {
   const currentRows = sheet.getMaxRows();
   const currentCols = sheet.getMaxColumns();
   
-  // ปรับจํานวนคอลัมน์ให้พอดีกับข้อมูล (ลดปริมาณเซลล์ว่างเพื่อความเร็วสูงสุดในการคำนวณ)
+  // ปรับจํานวนคอลัมน์ให้พอดี
   if (currentCols < targetCols) {
     sheet.insertColumnsAfter(currentCols, targetCols - currentCols);
-  } else if (currentCols > targetCols) {
-    sheet.deleteColumns(targetCols + 1, currentCols - targetCols);
   }
   
-  // ปรับจํานวนแถวให้พอดีกับข้อมูล
+  // ปรับจํานวนแถวเฉพาะกรณีที่แถวเดิมไม่พอ
   if (currentRows < targetRows) {
     sheet.insertRowsAfter(currentRows, targetRows - currentRows);
-  } else if (currentRows > targetRows) {
-    sheet.deleteRows(targetRows + 1, currentRows - targetRows);
+    SpreadsheetApp.flush(); // ยืนยันการขยายแถวก่อนเริ่มเขียนข้อมูล
   }
   
-  // 1. ตั้งค่าปิดการตัดข้อความ (Wrap Text) ทั่วทั้งช่วงข้อมูลก่อนเขียนข้อมูล เพื่อความเร็วกว่า และช่วยป้องกันไม่ให้แถวยืดความสูงตาม HTML
-  sheet.getRange(1, 1, targetRows, targetCols).setWrap(false);
-  
-  // 2. ปรับความสูงแถวให้เป็นขนาดปกติ เนื่องจากไม่มี Image Preview
   sheet.setRowHeight(1, 25);
-  if (targetRows > 1) {
-    sheet.setRowHeightsForced(2, targetRows - 1, 21);
+  
+  // เขียนข้อมูลลงในชีตแบบแบ่ง Chunk ขนาดพอดี (ทีละ 2,000 แถว / 34,000 เซลล์) เพื่อไม่ให้เกิน Limit ของ Google Sheets API
+  const WRITE_BATCH_SIZE = 2000;
+  for (let i = 0; i < targetRows; i += WRITE_BATCH_SIZE) {
+    const chunk = finalRows2D.slice(i, i + WRITE_BATCH_SIZE);
+    sheet.getRange(i + 1, 1, chunk.length, targetCols).setValues(chunk);
+    SpreadsheetApp.flush(); // บังคับส่งข้อมูลในแต่ละ 2,000 แถวทันที
   }
   
-  // 3. เขียนข้อมูลทั้งหมดลงในชีตในคราวเดียว
-  sheet.getRange(1, 1, targetRows, targetCols).setValues(finalRows2D);
-  
-  // 4. จัดรูปแบบหัวตาราง
+  // 3. จัดรูปแบบหัวตาราง
   sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
+  sheet.getRange(1, 1, 1, targetCols).setWrap(false);
   sheet.setFrozenRows(1);
   
   Logger.log(`✅ ${allRowsData.length} products exported to sheet '${EXPORT_SHEET_NAME}'`);
@@ -573,14 +565,57 @@ function stripHtml_(html) {
 // HELPER: แสดง Alert อย่างปลอดภัย แม้ไม่ได้รันจากหน้าต่างชีตโดยตรง (เช่น รันผ่าน Editor)
 // ============================================================
 function showAlert_(message) {
-  try {
-    const ui = SpreadsheetApp.getUi();
-    if (ui) {
-      ui.alert(message);
-      return;
-    }
-  } catch (e) {
-    // UI ไม่สามารถเรียกใช้ได้ในบริบทนี้ (เช่น รันจาก Editor หรือ Trigger)
-  }
   Logger.log("ALERT: " + message);
+}
+
+// ============================================================
+// WEBHOOK ENDPOINT FOR PYTHON (ไม่ต้องใช้ Google Cloud / บัตรเครดิต)
+// ============================================================
+function doPost(e) {
+  try {
+    const contents = JSON.parse(e.postData.contents);
+    const rows = contents.rows;
+    if (!rows || !rows.length) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "No rows provided" })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(EXPORT_SHEET_NAME);
+    if (!sheet) {
+      sheet = ss.insertSheet(EXPORT_SHEET_NAME);
+    } else {
+      sheet.clearContents();
+    }
+    
+    const targetRows = rows.length;
+    const targetCols = rows[0].length;
+    
+    const currentRows = sheet.getMaxRows();
+    const currentCols = sheet.getMaxColumns();
+    
+    if (currentCols < targetCols) {
+      sheet.insertColumnsAfter(currentCols, targetCols - currentCols);
+    }
+    if (currentRows < targetRows) {
+      sheet.insertRowsAfter(currentRows, targetRows - currentRows);
+      SpreadsheetApp.flush();
+    }
+    
+    sheet.setRowHeight(1, 25);
+    
+    const WRITE_BATCH_SIZE = 5000;
+    for (let i = 0; i < targetRows; i += WRITE_BATCH_SIZE) {
+      const chunk = rows.slice(i, i + WRITE_BATCH_SIZE);
+      sheet.getRange(i + 1, 1, chunk.length, targetCols).setValues(chunk);
+      SpreadsheetApp.flush();
+    }
+    
+    sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold");
+    sheet.getRange(1, 1, 1, targetCols).setWrap(false);
+    sheet.setFrozenRows(1);
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", count: targetRows - 1 })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
 }
