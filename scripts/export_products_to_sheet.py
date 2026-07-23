@@ -277,7 +277,7 @@ def update_google_sheet(rows_2d):
                     res = requests.post(
                         webapp_url,
                         json={"rows": chunk_rows, "action": action},
-                        timeout=60
+                        timeout=180
                     )
                     if res.status_code == 200:
                         try:

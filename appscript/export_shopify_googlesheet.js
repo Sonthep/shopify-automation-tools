@@ -585,7 +585,11 @@ function doPost(e) {
     if (!sheet) {
       sheet = ss.insertSheet(EXPORT_SHEET_NAME);
     } else if (action === "overwrite") {
-      sheet.clearContents();
+      const lastR = sheet.getLastRow();
+      const lastC = sheet.getLastColumn();
+      if (lastR > 0 && lastC > 0) {
+        sheet.getRange(1, 1, lastR, lastC).clearContent();
+      }
     }
     
     const startRow = (action === "append") ? Math.max(1, sheet.getLastRow() + 1) : 1;
@@ -603,8 +607,6 @@ function doPost(e) {
     if (currentRows < neededRows) {
       sheet.insertRowsAfter(currentRows, neededRows - currentRows);
     }
-    
-    sheet.setRowHeight(1, 25);
     
     // Write range directly without repetitive SpreadsheetApp.flush()
     sheet.getRange(startRow, 1, targetRows, targetCols).setValues(rows);
