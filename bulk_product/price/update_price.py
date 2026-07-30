@@ -1,4 +1,4 @@
-﻿"""
+"""
 Bulk-update Price and Compare At Price via Shopify Bulk Operation API.
 
 CSV column names ที่รองรับ (auto-detect)
@@ -43,7 +43,7 @@ BASE_DIR = os.path.dirname(__file__)
 PRODUCT_GID_COLS = ["Product GID", "ProductGID", "product_gid", "Product Id", "ProductId"]
 VARIANT_GID_COLS = ["Variant GID", "VariantGID", "variant_gid", "Variant Id", "VariantId"]
 PRICE_COLS       = ["Price", "price", "ราคา"]
-COMPARE_COLS     = ["Compare At Price", "CompareAtPrice", "compare_at_price", "ราคาเปรียบเทียบ"]
+COMPARE_COLS     = ["Compare At Price", "CompareAtPrice", "compare_at_price", "Compare-at price", "Compare-at Price", "ราคาเปรียบเทียบ"]
 
 
 def find_col(df_cols: list[str], candidates: list[str]) -> str | None:

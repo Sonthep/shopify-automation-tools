@@ -4,8 +4,8 @@
 // CONFIG
 // ============================================================
 var SHOP = PropertiesService.getScriptProperties().getProperty("SHOP") || "sevenfive-4062.myshopify.com";
-var CLIENT_ID = PropertiesService.getScriptProperties().getProperty("CLIENT_ID") || "YOUR_CLIENT_ID";
-var CLIENT_SECRET = PropertiesService.getScriptProperties().getProperty("CLIENT_SECRET") || "YOUR_CLIENT_SECRET";
+var CLIENT_ID = PropertiesService.getScriptProperties().getProperty("CLIENT_ID") || "696e1e9162c702cc07c2f94a1beacf8a";
+var CLIENT_SECRET = PropertiesService.getScriptProperties().getProperty("CLIENT_SECRET") || "xxxxxxxxxxxxxxxxxxx";
 // ============================================================
 var EXPORT_SHEET_NAME = "Products Export";
 var POLL_INTERVAL_MS = 10000; // เช็คสถานะทุกๆ 10 วินาที
@@ -40,8 +40,8 @@ function exportProductsToSheet() {
   // === Phase 2: ถ้าเคย start query ไว้แล้ว และตอนนี้ COMPLETED → ดาวน์โหลดทันที! ===
   if (savedOpId && currentOp && currentOp.status === "COMPLETED" && currentOp.url) {
     Logger.log("✅ Bulk op COMPLETED (" + currentOp.objectCount + " objects) — downloading now...");
+    props.deleteProperty(PROP_LAST_BULK_OP_ID); // ลบค่าค้างก่อนเพื่อไม่ให้ติดค้างดึงไฟล์เดิมซ้ำ
     downloadAndProcessJSONL_(currentOp.url);
-    props.deleteProperty(PROP_LAST_BULK_OP_ID);
     showAlert_("✅ Export สำเร็จ! " + currentOp.objectCount + " รายการ");
     return;
   }
@@ -73,8 +73,8 @@ function exportProductsToSheet() {
   const result = pollStatus_(opId, 180000); // max 3 นาที
   
   if (result.status === "COMPLETED") {
+    props.deleteProperty(PROP_LAST_BULK_OP_ID); // ลบค่าค้างก่อนดาวน์โหลด
     downloadAndProcessJSONL_(result.url);
-    props.deleteProperty(PROP_LAST_BULK_OP_ID);
     showAlert_("✅ ดึงข้อมูลสินค้าและเขียนลงชีตเรียบร้อยแล้ว!");
   } else if (result.status === "RUNNING" || result.status === "CREATED") {
     // Shopify ยังไม่เสร็จ — save state แล้วบอกให้ user รันซ้ำ
@@ -441,33 +441,45 @@ function downloadAndProcessJSONL_(url) {
   const targetRows = finalRows2D.length;  // รวม header 1 แถว
   const targetCols = finalHeaders.length; // 17 cols
   
-  sheet.setRowHeight(1, 25);
-  
   let usedSheetsApi = false;
   
   if (typeof Sheets !== "undefined") {
     try {
       Logger.log("  Writing with Sheets API (fast path, 8K rows/batch)...");
+      const sheetId = sheet.getSheetId();
       
       // 1. ล้างข้อมูลเดิมทั้งหมด (ไม่ลบ sheet → ไม่ #REF!)
-      Sheets.Spreadsheets.Values.clear(ssId, EXPORT_SHEET_NAME);
+      Sheets.Spreadsheets.Values.clear({}, ssId, EXPORT_SHEET_NAME);
       
-      // 2. เพิ่มแถวถ้าจำเป็น (ผ่าน batchUpdate เพื่อไม่ timeout)
+      // 2. ปรับแต่งชีต + เพิ่มแถวผ่าน Sheets API batchUpdate ทันทีในคำสั่งเดียว
       const currentMaxRows = sheet.getMaxRows();
+      const requests = [
+        {
+          updateSheetProperties: {
+            properties: { sheetId: sheetId, gridProperties: { frozenRowCount: 1 } },
+            fields: "gridProperties.frozenRowCount"
+          }
+        },
+        {
+          repeatCell: {
+            range: { sheetId: sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: targetCols },
+            cell: { userEnteredFormat: { textFormat: { bold: true }, wrapStrategy: "CLIP" } },
+            fields: "userEnteredFormat(textFormat,wrapStrategy)"
+          }
+        }
+      ];
+
       if (currentMaxRows < targetRows) {
-        Sheets.Spreadsheets.batchUpdate(
-          {
-            requests: [{
-              appendDimension: {
-                sheetId: sheet.getSheetId(),
-                dimension: "ROWS",
-                length: targetRows - currentMaxRows
-              }
-            }]
-          },
-          ssId
-        );
+        requests.push({
+          appendDimension: {
+            sheetId: sheetId,
+            dimension: "ROWS",
+            length: targetRows - currentMaxRows
+          }
+        });
       }
+
+      Sheets.Spreadsheets.batchUpdate({ requests: requests }, ssId);
       
       // 3. เขียน batch ละ 8,000 แถว (~2.7MB ต่อ request — ต่ำกว่า limit 10MB)
       const API_BATCH_SIZE = 8000;
@@ -493,6 +505,8 @@ function downloadAndProcessJSONL_(url) {
   // Fallback: SpreadsheetApp.setValues() ถ้าไม่ได้เปิด Service หรือ API error
   if (!usedSheetsApi) {
     Logger.log("  Writing with setValues (10K batch)...");
+    sheet.setRowHeight(1, 25);
+    sheet.setFrozenRows(1);
     sheet.clearContents();
     const currentRows = sheet.getMaxRows();
     if (currentRows < targetRows) {
@@ -503,12 +517,9 @@ function downloadAndProcessJSONL_(url) {
       const chunk = finalRows2D.slice(i, i + WRITE_BATCH_SIZE);
       sheet.getRange(i + 1, 1, chunk.length, targetCols).setValues(chunk);
     }
+    sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold").setWrap(false);
+    SpreadsheetApp.flush();
   }
-  
-  // จัดรูปแบบหัวตาราง + flush ครั้งเดียวตอนท้าย
-  sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold").setWrap(false);
-  sheet.setFrozenRows(1);
-  SpreadsheetApp.flush();
   
   Logger.log(`✅ ${allRowsData.length} products exported to sheet '${EXPORT_SHEET_NAME}' (Sheets API: ${usedSheetsApi})`);
 }

@@ -1,9 +1,11 @@
+
+
 // ============================================================
 // CONFIG & CREDENTIALS (Scoped object to prevent clashes with other gs files)
 // ============================================================
 var SHOPIFY_INV_CONFIG = {
   SHOP: "sevenfive-4062.myshopify.com",
-  CLIENT_ID: "xxxxxxxxxxxxxxxxxxx",
+  CLIENT_ID: "696e1e9162c702cc07c2f94a1beacf8a",
   CLIENT_SECRET: "xxxxxxxxxxxxxxxxxxx",
   TARGET_SHEET_NAME: "Inventory",
   LOG_SHEET_NAME: "Log run script",
