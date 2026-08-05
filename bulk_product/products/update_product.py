@@ -11,7 +11,7 @@ import argparse
 import pandas as pd
 import requests
 
-from utils import make_headers, get_val, gql, read_csv_auto, API_URL
+from utils import make_headers, get_val, gql, read_csv_auto, API_URL, get_variant_gids_by_skus
 
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
@@ -47,6 +47,68 @@ COL_THAI = {
 }
 
 
+def build_metafields(row):
+    standard_cols = {
+        "Product GID", "Variant GID", "Variant SKU", "Title", "Body (HTML)",
+        "Vendor", "Type", "Tags", "Status", "Price", "Compare At Price",
+        "New SKU", "Inventory quantity", "Inventory Item ID", "Sales Channels",
+        "Published Channels", "Title TH", "Body (HTML) TH", "meta_title",
+        "meta_description"
+    }
+    metafields = []
+    for col in row.index:
+        if col in standard_cols:
+            continue
+        raw = get_val(row, col)
+        if raw is None or str(raw).strip() == "":
+            continue
+
+        namespace = None
+        key = None
+        if "." in col:
+            namespace, key = col.split(".", 1)
+        elif "_" in col:
+            namespace, key = col.split("_", 1)
+
+        if not namespace or not key:
+            continue
+
+        namespace = namespace.strip()
+        key = key.strip()
+        if not namespace or not key:
+            continue
+
+        metafields.append({
+            "namespace": namespace,
+            "key": key,
+            "value": str(raw),
+            "type": "single_line_text_field",
+        })
+    return metafields
+
+
+def get_first_matching_val(row, candidates):
+    for col in candidates:
+        if col in row.index:
+            val = get_val(row, col)
+            if val is not None and str(val).strip() != "":
+                return str(val).strip()
+    return None
+
+
+def sanitize_price(val):
+    if val is None or val == "":
+        return None
+    val_str = str(val).replace(",", "").strip()
+    try:
+        float_val = float(val_str)
+        if float_val.is_integer():
+            return str(int(float_val))
+        return f"{float_val:.2f}"
+    except ValueError:
+        return val_str
+
+
 # ── Product update (Bulk API) ─────────────────────────────────
 
 def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, list, list]:
@@ -62,34 +124,144 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, list, list]:
     var_gid_col = COL["variant_gid"]      # "Variant GID"
     inv_id_col  = COL["inventory_item_id"] # "Inventory Item ID"
 
-    if gid_col not in df.columns:
-        print(f"[ERR] Column '{gid_col}' not found. Available: {df.columns.tolist()}")
+    has_product_gid = gid_col in df.columns
+    has_variant_gid = var_gid_col in df.columns
+
+    if not has_product_gid and not has_variant_gid:
+        print(f"[ERR] Need '{gid_col}' or '{var_gid_col}'. Available: {df.columns.tolist()}")
         return 0, [], []
 
     inv_entries:   list = []
     price_entries: list = []
     count = 0
 
+    # If the CSV contains SKUs but not Variant GIDs, resolve SKUs -> variant GIDs
+    sku_col = COL["sku"] if COL["sku"] in df.columns else None
+    need_variant_resolution = (COL["variant_gid"] not in df.columns) and (sku_col is not None)
+    variant_gid_map = {}
+    if need_variant_resolution:
+        try:
+            skus = df[sku_col].dropna().unique().tolist()
+            if skus:
+                print(f"Resolving {len(skus)} SKUs to variant GIDs...")
+                variant_gid_map = get_variant_gids_by_skus(API_URL, HEADERS, skus)
+        except Exception as e:
+            print(f"  [WARN] Failed to resolve SKUs to variant GIDs: {e}")
+
+    # If CSV has Product GIDs and price but no VariantGID/SKU, resolve product -> variant IDs
+    need_variant_from_product = has_product_gid and (COL["variant_gid"] not in df.columns) and (sku_col is None)
+    variant_map_by_product: dict = {}
+    if need_variant_from_product:
+        products_to_resolve = []
+        for _, row in df.iterrows():
+            price = get_val(row, COL["price"])
+            compare_price = get_val(row, COL["compare_at_price"])
+            if price is not None or compare_price is not None:
+                gid = get_val(row, gid_col)
+                if gid:
+                    products_to_resolve.append(gid)
+        products_to_resolve = list(dict.fromkeys(products_to_resolve))
+        if products_to_resolve:
+            print(f"Resolving variants for {len(products_to_resolve)} products...")
+            batch_size = 50
+            for i in range(0, len(products_to_resolve), batch_size):
+                batch = products_to_resolve[i:i + batch_size]
+                aliases = []
+                for j, gid in enumerate(batch):
+                    aliases.append(
+                        f'p{j}: node(id: "{gid}") {{ ... on Product {{ variants(first:250) {{ edges {{ node {{ id }} }} }} }} }}'
+                    )
+                query = f"{{ {' '.join(aliases)} }}"
+                body = gql(API_URL, HEADERS, query)
+                data = (body or {}).get("data", {})
+                for j, gid in enumerate(batch):
+                    edges = data.get(f"p{j}", {}).get("variants", {}).get("edges", [])
+                    if not edges:
+                        variant_map_by_product[gid] = []
+                    else:
+                        variant_map_by_product[gid] = [e["node"]["id"] for e in edges]
+                time.sleep(0.4)
+
+    # If we only have Variant GIDs, resolve the parent Product ID for bulk price updates.
+    variant_to_product_map: dict = {}
+    if has_variant_gid and not has_product_gid:
+        variants_to_resolve = []
+        for _, row in df.iterrows():
+            price = get_val(row, COL["price"])
+            compare_price = get_val(row, COL["compare_at_price"])
+            if price is not None or compare_price is not None:
+                variant_gid = get_val(row, var_gid_col)
+                if variant_gid:
+                    variants_to_resolve.append(variant_gid)
+        variants_to_resolve = list(dict.fromkeys(variants_to_resolve))
+        if variants_to_resolve:
+            print(f"Resolving parent products for {len(variants_to_resolve)} variants...")
+            batch_size = 50
+            for i in range(0, len(variants_to_resolve), batch_size):
+                batch = variants_to_resolve[i:i + batch_size]
+                aliases = []
+                for j, variant_gid in enumerate(batch):
+                    aliases.append(
+                        f'v{j}: node(id: "{variant_gid}") {{ ... on ProductVariant {{ id product {{ id }} }} }}'
+                    )
+                query = f"{{ {' '.join(aliases)} }}"
+                body = gql(API_URL, HEADERS, query)
+                data = (body or {}).get("data", {})
+                for j, variant_gid in enumerate(batch):
+                    product = data.get(f"v{j}", {}).get("product", {})
+                    variant_to_product_map[variant_gid] = product.get("id")
+                time.sleep(0.4)
+
     with open(jsonl_file, "w", encoding="utf-8") as f:
         for _, row in df.iterrows():
-            gid = get_val(row, gid_col)
-            if not gid:
-                continue
+            gid = get_val(row, gid_col) if has_product_gid else None
 
-            input_data: dict = {"id": gid}
+            input_data: dict = {}
+            if gid:
+                input_data["id"] = gid
 
-            if v := get_val(row, COL["title"]):
-                input_data["title"] = v
-            if v := get_val(row, COL["body_html"]):
-                input_data["descriptionHtml"] = v
-            if v := get_val(row, COL["vendor"]):
-                input_data["vendor"] = v
-            if v := get_val(row, COL["product_type"]):
-                input_data["productType"] = v
-            if v := get_val(row, COL["tags"]):
-                input_data["tags"] = [t.strip() for t in v.split(",")]
-            if v := get_val(row, COL["status"]):
-                input_data["status"] = v.upper()
+                if COL["title"] in row.index:
+                    v = get_val(row, COL["title"])
+                    if v is not None:
+                        input_data["title"] = v
+                if COL["body_html"] in row.index:
+                    v = get_val(row, COL["body_html"])
+                    if v is not None:
+                        input_data["descriptionHtml"] = v
+                if COL["vendor"] in row.index:
+                    v = get_val(row, COL["vendor"])
+                    if v is not None:
+                        input_data["vendor"] = v
+                if COL["product_type"] in row.index:
+                    v = get_val(row, COL["product_type"])
+                    if v is not None:
+                        input_data["productType"] = v
+                        input_data.setdefault("metafields", []).append({
+                            "namespace": "custom",
+                            "key":       "part_type",
+                            "value":     v,
+                            "type":      "single_line_text_field",
+                        })
+                if COL["tags"] in row.index:
+                    v = get_val(row, COL["tags"])
+                    if v is not None:
+                        input_data["tags"] = [t.strip() for t in v.split(",") if t.strip()]
+                    else:
+                        input_data["tags"] = []
+                if COL["status"] in row.index:
+                    v = get_val(row, COL["status"])
+                    if v is not None:
+                        input_data["status"] = v.upper()
+
+                # Dynamic metafields from CSV columns (e.g. custom.spapart_or_product)
+                extra_metafields = build_metafields(row)
+                if extra_metafields:
+                    input_data.setdefault("metafields", []).extend(extra_metafields)
+
+            # Only write productUpdate if actual product fields (title, body, vendor, metafields, etc.) are present beyond just "id"
+            if len(input_data) > 1:
+                f.write(json.dumps({"input": input_data}) + "\n")
+                count += 1
 
             # ── Inventory (direct Inventory Item ID) ──
             inv_id = get_val(row, inv_id_col) if inv_id_col in df.columns else None
@@ -101,29 +273,56 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, list, list]:
                     "quantity":        int(float(qty)),
                 })
 
-            # ── Price / SKU (direct Variant GID) ──
-            price         = get_val(row, COL["price"])
-            compare_price = get_val(row, COL["compare_at_price"])
-            new_sku       = get_val(row, COL["new_sku"]) if "new_sku" in COL and COL["new_sku"] in df.columns else None
+            # ── Price / SKU (direct Variant GID or Product GID) ──
+            price_raw     = get_first_matching_val(row, ["Variant Price", "Price", "price"])
+            compare_raw   = get_first_matching_val(row, ["Compare At Price", "Compare-at price", "Variant Compare At Price", "compare_at_price"])
 
-            if price or compare_price or new_sku:
-                variant_gid = get_val(row, var_gid_col) if var_gid_col in df.columns else None
-                if variant_gid:
-                    entry = {
-                        "productId":      gid,
-                        "variantId":      variant_gid,
-                        "price":          price,
-                        "compareAtPrice": compare_price,
-                    }
-                    if new_sku:
-                        entry["sku"] = new_sku
-                    price_entries.append(entry)
+            price         = sanitize_price(price_raw)
+            compare_price = sanitize_price(compare_raw)
+            
+            # Determine SKU to update (New SKU or Variant SKU)
+            sku_to_set = None
+            if "new_sku" in COL and COL["new_sku"] in df.columns:
+                sku_to_set = get_val(row, COL["new_sku"])
+            elif COL["sku"] in df.columns and var_gid_col in df.columns:
+                # If both Variant GID and Variant SKU are present, user is setting SKU for the variant
+                sku_to_set = get_val(row, COL["sku"])
 
-            if len(input_data) <= 1:
-                continue
+            if price is not None or compare_price is not None or sku_to_set is not None:
+                variant_gid = None
+                if var_gid_col in df.columns:
+                    variant_gid = get_val(row, var_gid_col)
+                else:
+                    sku_val = get_val(row, COL["sku"]) if COL["sku"] in df.columns else None
+                    variant_gid = variant_gid_map.get(sku_val) if sku_val else None
 
-            f.write(json.dumps({"input": input_data}) + "\n")
-            count += 1
+                if not variant_gid and gid and gid in variant_map_by_product:
+                    for vid in variant_map_by_product.get(gid, []):
+                        entry = {
+                            "productId":      gid,
+                            "variantId":      vid,
+                        }
+                        if price is not None:
+                            entry["price"] = price
+                        if compare_price is not None:
+                            entry["compareAtPrice"] = compare_price
+                        if sku_to_set is not None:
+                            entry["sku"] = sku_to_set
+                        price_entries.append(entry)
+                else:
+                    product_id = gid if has_product_gid else variant_to_product_map.get(variant_gid)
+                    if variant_gid and product_id:
+                        entry = {
+                            "productId":      product_id,
+                            "variantId":      variant_gid,
+                        }
+                        if price is not None:
+                            entry["price"] = price
+                        if compare_price is not None:
+                            entry["compareAtPrice"] = compare_price
+                        if sku_to_set is not None:
+                            entry["sku"] = sku_to_set
+                        price_entries.append(entry)
 
     print(f"{count} product rows -> {jsonl_file} | {len(inv_entries)} inv | {len(price_entries)} price")
     return count, inv_entries, price_entries
@@ -168,12 +367,16 @@ def build_price_jsonl(price_entries: list, jsonl_file: str) -> int:
     with open(jsonl_file, "w", encoding="utf-8") as f:
         for entry in price_entries:
             variant_input: dict = {"id": entry["variantId"]}
-            if entry.get("price") is not None:
+            if "price" in entry and entry["price"] != "":
                 variant_input["price"] = entry["price"]
-            if entry.get("compareAtPrice") is not None:
-                variant_input["compareAtPrice"] = entry["compareAtPrice"]
+            if "compareAtPrice" in entry and entry["compareAtPrice"] is not None:
+                compare_value = entry["compareAtPrice"]
+                variant_input["compareAtPrice"] = None if compare_value == "" else compare_value
             if entry.get("sku") is not None:
                 variant_input["inventoryItem"] = {"sku": entry["sku"]}
+            if len(variant_input) == 1:
+                # Only id present, nothing to update.
+                continue
             f.write(json.dumps({"productId": entry["productId"], "variants": [variant_input]}) + "\n")
             count += 1
     print(f"{count} price rows -> {jsonl_file}")

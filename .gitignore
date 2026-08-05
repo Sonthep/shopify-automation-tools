@@ -25,6 +25,8 @@ bulk-update-product/*.jsonl
 bulk-update-product/*.json
 bulk-update-product/not_found*.csv
 bulk-update-product/failed.csv
+bulk-update-product/__pycache__/
+bulk-update-product/pdf ต่างประเทศ/
 
 # images: temp image folders
 bulk-update-product/images/update_image/
@@ -71,13 +73,6 @@ download/image_form_abroad/
 download/images_batch27/
 download/canva_test_folder/
 
-# Ignored data and images
-*.xlsx
-*.csv
-download/image_form_abroad/
-download/images_batch27/
-download/canva_test_folder/
-
 # menu-importer new structure
 menu-importer/data/
 menu-importer/backups/
@@ -98,4 +93,14 @@ bulk_product/data/outputs/
 not upload complete/
 success_skus.txt
 
+# Ignore large media and data files
+*.pdf
+*.zip
+*.xlsx
+*.xls
+*.doc
+*.pptx
+*.jsonl
+bulk-update-product/
+menus-output.json
 

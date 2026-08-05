@@ -54,6 +54,24 @@ query($query: String!) {
 }
 """
 
+QUERY_PRODUCT_BY_ID = """
+query($id: ID!) {
+  product(id: $id) {
+    id
+    title
+    media(first: 50) {
+      edges {
+        node {
+          id
+          mediaContentType
+          status
+        }
+      }
+    }
+  }
+}
+"""
+
 MUTATION_CREATE_MEDIA = """
 mutation productCreateMedia($productId: ID!, $media: [CreateMediaInput!]!) {
   productCreateMedia(productId: $productId, media: $media) {
@@ -158,32 +176,55 @@ def delete_existing_videos(product_id: str, media_edges: list, dry_run: bool = F
     print(f"    ✅ Deleted {len(deleted)} video media item(s).")
 
 
-def process_row(sku: str, youtube_url: str, delete_old: bool, dry_run: bool) -> bool:
-    print(f"\n  SKU: {sku}")
+def process_row(sku: str, youtube_url: str, delete_old: bool, dry_run: bool, product_gid: str = "") -> bool:
+    print(f"\n  SKU/ID: {sku or product_gid}")
 
-    # 1. Lookup product
-    res = gql(API_URL, HEADERS, QUERY_PRODUCT_BY_SKU, {"query": f"sku:{sku}"})
-    if not res:
-        print(f"    ❌ GraphQL error looking up SKU.")
-        return False
+    clean_url = normalize_youtube_url(youtube_url)
+    product_id = ""
 
-    edges = res.get("data", {}).get("products", {}).get("edges", [])
-    if not edges:
-        print(f"    ❌ Product not found for SKU: {sku}")
-        return False
+    # If we have product_gid, we might be able to skip the lookup entirely!
+    if product_gid:
+        if not str(product_gid).startswith("gid://shopify/Product/"):
+            product_id = f"gid://shopify/Product/{product_gid}"
+        else:
+            product_id = str(product_gid)
 
-    product = edges[0]["node"]
-    product_id = product["id"]
-    print(f"    📦 Found: {product['title']}  ({product_id})")
+        if not delete_old:
+            # SUPER FAST PATH: No query needed, just mutate!
+            print(f"    ⚡ FAST PATH using Product GID: {product_id}")
+            return add_video_to_product(product_id, clean_url, dry_run)
+            
+        # If we need to delete old videos, we must query the product by ID to get media edges
+        res = gql(API_URL, HEADERS, QUERY_PRODUCT_BY_ID, {"id": product_id})
+        if not res or not res.get("data", {}).get("product"):
+            print(f"    ❌ Product not found for GID: {product_id}")
+            return False
+        product = res["data"]["product"]
+        print(f"    📦 Found by GID: {product.get('title')} ({product_id})")
+        media_edges = product.get("media", {}).get("edges", [])
 
-    media_edges = product.get("media", {}).get("edges", [])
+    else:
+        # Fallback to SKU lookup
+        res = gql(API_URL, HEADERS, QUERY_PRODUCT_BY_SKU, {"query": f"sku:{sku}"})
+        if not res:
+            print(f"    ❌ GraphQL error looking up SKU.")
+            return False
+
+        edges = res.get("data", {}).get("products", {}).get("edges", [])
+        if not edges:
+            print(f"    ❌ Product not found for SKU: {sku}")
+            return False
+
+        product = edges[0]["node"]
+        product_id = product["id"]
+        print(f"    📦 Found: {product.get('title')} ({product_id})")
+        media_edges = product.get("media", {}).get("edges", [])
 
     # 2. Delete old videos (optional)
     if delete_old:
         delete_existing_videos(product_id, media_edges, dry_run)
 
     # 3. Add the new video
-    clean_url = normalize_youtube_url(youtube_url)
     return add_video_to_product(product_id, clean_url, dry_run)
 
 
@@ -213,13 +254,22 @@ def main():
     # Read CSV
     df = read_csv_auto(csv_path)
     df.columns = [c.strip().lower() for c in df.columns]
+    # Check for flexible column names
+    gid_col = "product gid" if "product gid" in df.columns else "product_gid" if "product_gid" in df.columns else None
+    url_col = "link_video" if "link_video" in df.columns else "link video" if "link video" in df.columns else "youtube_url" if "youtube_url" in df.columns else None
+    sku_col = "variant sku" if "variant sku" in df.columns else "sku" if "sku" in df.columns else None
 
-    for required_col in ("sku", "youtube_url"):
-        if required_col not in df.columns:
-            print(f"❌ Missing column '{required_col}' in CSV. Found: {list(df.columns)}")
-            sys.exit(1)
+    # We need EITHER sku OR product gid, plus youtube_url/link_video
+    if not url_col:
+        print(f"❌ Missing URL column (link_video or youtube_url) in CSV. Found: {list(df.columns)}")
+        sys.exit(1)
+        
+    if not sku_col and not gid_col:
+        print(f"❌ Missing identifier column (variant sku, sku, or product_gid) in CSV. Found: {list(df.columns)}")
+        sys.exit(1)
 
-    rows = df.dropna(subset=["sku", "youtube_url"]).to_dict("records")
+    # Convert to records
+    rows = df.to_dict("records")
     if args.limit:
         rows = rows[: args.limit]
 
@@ -233,21 +283,29 @@ def main():
     failed_rows = []
 
     for row in rows:
-        sku = str(row["sku"]).strip()
-        url = str(row["youtube_url"]).strip()
-        if not sku or not url:
+        url = str(row.get(url_col, "")).strip() if url_col else ""
+        sku = str(row.get(sku_col, "")).strip() if sku_col else ""
+        pgid = str(row.get(gid_col, "")).strip() if gid_col else ""
+        
+        # Handle "nan" from pandas
+        if sku.lower() == "nan": sku = ""
+        if pgid.lower() == "nan": pgid = ""
+        if url.lower() == "nan": url = ""
+
+        if not url or (not sku and not pgid):
             continue
+            
         try:
-            ok = process_row(sku, url, delete_old=args.delete_old, dry_run=args.dry_run)
+            ok = process_row(sku, url, delete_old=args.delete_old, dry_run=args.dry_run, product_gid=pgid)
             if ok:
                 success += 1
             else:
                 fail += 1
-                failed_rows.append({"sku": sku, "youtube_url": url})
+                failed_rows.append({"sku": sku, "product_gid": pgid, "link_video": url})
         except Exception as e:
             print(f"    ❌ Exception: {e}")
             fail += 1
-            failed_rows.append({"sku": sku, "youtube_url": url})
+            failed_rows.append({"sku": sku, "product_gid": pgid, "link_video": url})
 
         time.sleep(0.5)  # avoid rate limiting
 
@@ -259,7 +317,7 @@ def main():
     if failed_rows:
         fail_path = os.path.join(os.path.dirname(csv_path), "failed_video.csv")
         with open(fail_path, "w", newline="", encoding="utf-8-sig") as f:
-            writer = csv.DictWriter(f, fieldnames=["sku", "youtube_url"])
+            writer = csv.DictWriter(f, fieldnames=["sku", "product_gid", "link_video"])
             writer.writeheader()
             writer.writerows(failed_rows)
         print(f"⚠️  Failed rows saved to: {fail_path}")

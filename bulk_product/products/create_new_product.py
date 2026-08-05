@@ -6,6 +6,8 @@ import os
 import requests
 import pandas as pd
 import time
+import os
+import argparse
 from utils import make_headers, gql as _gql, get_val as _get_val, read_csv_auto, API_URL
 
 HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
@@ -30,7 +32,7 @@ def build_metafields(row):
         "Variant Requires Shipping", "Variant Taxable", "Variant Inventory Qty",
         "Variant Compare At Price", "Variant Barcode", "Image Src",
         "Image Position", "Image Alt Text", "Gift Card", "SEO Title",
-        "SEO Description"
+        "SEO Description", "Sales Channels", "Published Channels"
     }
     metafields = []
     for col in row.index:
@@ -87,6 +89,10 @@ def create_product(row, sku=""):
     if v := get_val(row, "Handle"):          input_data["handle"] = v
     if v := get_val(row, "Tags"):            input_data["tags"] = [t.strip() for t in v.split(",")]
     if v := get_val(row, "Status"):          input_data["status"] = v.upper()
+
+    metafields = build_metafields(row)
+    if metafields:
+        input_data["metafields"] = metafields
 
     # productOptions (replaces old "options")
     options = []
@@ -237,6 +243,7 @@ def create_variant(product_id, product_options, row, default_variant_id=None):
 
     if v := get_val(row, "Variant SKU"):   variant["inventoryItem"] = {"sku": v}
     if v := get_val(row, "Variant Price"): variant["price"] = v
+    if v := get_val(row, "Variant Compare At Price"): variant["compareAtPrice"] = v
 
     # Weight
     weight_val  = get_val(row, "Variant Grams")
@@ -319,31 +326,51 @@ def create_variant(product_id, product_options, row, default_variant_id=None):
 
 
 # ── Step 3: Publish to Sales Channels ────────────────────────
-_publication_ids_cache = None
+_publication_map_cache = None
 _location_id_cache = None
 
-def get_publication_ids():
-    global _publication_ids_cache
-    if _publication_ids_cache is not None:
-        return _publication_ids_cache
+def get_publication_map():
+    global _publication_map_cache
+    if _publication_map_cache is not None:
+        return _publication_map_cache
 
     query = "{ publications(first: 50) { edges { node { id name } } } }"
     body = gql(query)
     if not body:
-        return []
+        return {}
 
     publication_edges = body.get("data", {}).get("publications", {}).get("edges", [])
-    ids = [edge["node"]["id"] for edge in publication_edges if edge.get("node", {}).get("id")]
+    pub_map = {
+        edge["node"]["name"].strip().lower(): edge["node"]["id"]
+        for edge in publication_edges
+        if edge.get("node", {}).get("id") and edge.get("node", {}).get("name")
+    }
+    _publication_map_cache = pub_map
     names = [edge["node"].get("name") for edge in publication_edges if edge.get("node", {}).get("name")]
-    _publication_ids_cache = ids
-    print(f"  📡 Publications found: {len(ids)} | {names}")
-    return ids
+    print(f"  📡 Publications found: {len(pub_map)} | {names}")
+    return pub_map
 
 
-def publish_product(product_id):
-    pub_ids = get_publication_ids()
-    if not pub_ids:
+def publish_product(product_id, target_channels=None):
+    pub_map = get_publication_map()
+    if not pub_map:
         print("  ⚠️ No publications found to publish to")
+        return
+
+    # Default to the 3 channels: Online Store, Point of Sale, Inbox (excludes NTS Storefront)
+    if target_channels is None:
+        target_channels = ["Online Store", "Point of Sale", "Inbox"]
+
+    target_ids = []
+    selected_names = []
+    for ch in target_channels:
+        ch_lower = ch.strip().lower()
+        if ch_lower in pub_map:
+            target_ids.append(pub_map[ch_lower])
+            selected_names.append(ch.strip())
+
+    if not target_ids:
+        print(f"  ⚠️ No matching publication IDs for channels: {target_channels}")
         return
 
     mutation = """
@@ -355,7 +382,7 @@ def publish_product(product_id):
     }"""
     variables = {
         "id":    product_id,
-        "input": [{"publicationId": pid} for pid in pub_ids],
+        "input": [{"publicationId": pid} for pid in target_ids],
     }
     body = gql(mutation, variables)
     if not body:
@@ -365,7 +392,7 @@ def publish_product(product_id):
     if result.get("userErrors"):
         print(f"  ⚠️ Publish errors: {result['userErrors']}")
     else:
-        print(f"  🟢 Published to {len(pub_ids)} channel(s)")
+        print(f"  🟢 Published to {len(target_ids)} channel(s): {', '.join(selected_names)}")
 
 
 # ── Step 4: Add Images ────────────────────────────────────────
@@ -394,6 +421,84 @@ def add_images(product_id, row):
         print(f"  ⚠️ Image errors: {result['mediaUserErrors']}")
     else:
         print(f"  🖼️ Images queued: {len(image_urls)}")
+
+
+def get_translatable_digests(resource_id: str) -> dict:
+    query = f"""
+    query {{
+      translatableResource(resourceId: \"{resource_id}\") {{
+        translatableContent {{ key digest }}
+      }}
+    }}"""
+    body = gql(query)
+    if not body:
+        return {}
+    data = body.get("data", {})
+    resource = data.get("translatableResource")
+    if not resource:
+        return {}
+    return {item["key"]: item["digest"] for item in resource.get("translatableContent", [])}
+
+
+def register_translation(resource_id: str, key: str, value: str, locale: str = "th", digest: str | None = None) -> bool:
+    if not digest:
+        return False
+    mutation = """
+    mutation RegisterTranslation($resourceId: ID!, $input: TranslationInput!) {
+      translationsRegister(resourceId: $resourceId, translations: [$input]) {
+        translations { key locale }
+        userErrors { field message }
+      }
+    }"""
+    variables = {
+        "resourceId": resource_id,
+        "input": {
+            "key":                       key,
+            "value":                     value,
+            "locale":                    locale,
+            "translatableContentDigest": digest,
+        },
+    }
+    body = gql(mutation, variables)
+    if not body:
+        return False
+    result = body.get("data", {}).get("translationsRegister", {})
+    if result.get("userErrors"):
+        print(f"  ⚠️ Translation error for {key}: {result['userErrors']}")
+        return False
+    return True
+
+
+def create_thai_translations(resource_id: str, row) -> int:
+    translation_map = {
+        "title":           get_val(row, "Title_TH"),
+        "body_html":       get_val(row, "description_th"),
+        "meta_title":      get_val(row, "meta_title"),
+        "meta_description": get_val(row, "meta_description"),
+    }
+    translations = {
+        key: str(value).strip()
+        for key, value in translation_map.items()
+        if value and str(value).strip()
+    }
+    if not translations:
+        return 0
+
+    digests = get_translatable_digests(resource_id)
+    if not digests:
+        print(f"  ⚠️ Cannot fetch translation digests for {resource_id}")
+        return 0
+
+    count = 0
+    for key, value in translations.items():
+        digest = digests.get(key)
+        if not digest:
+            print(f"  ⚠️ No digest for translation key '{key}' on {resource_id}")
+            continue
+        if register_translation(resource_id, key, value, locale="th", digest=digest):
+            print(f"  ✅ Registered Thai translation for {key}")
+            count += 1
+    return count
 
 
 # ── Step 4: Set Inventory ─────────────────────────────────────
@@ -445,15 +550,24 @@ def set_inventory(inventory_item_id, qty):
 
 # ── Main ──────────────────────────────────────────────────────
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Create new Shopify products from a CSV file.")
-    parser.add_argument("--csv", default="data/test_create.csv", help="Path to CSV file relative to bulk-update-product folder")
+    parser = argparse.ArgumentParser(description="Create Shopify products from CSV.")
+    parser.add_argument("csv_pos", nargs="*", help="CSV file path (positional)")
+    parser.add_argument("--csv", default="", help="Path to CSV file relative to script directory")
+    parser.add_argument("--lang", choices=["EN", "TH", "BOTH"], default="EN", help="Prefer Title/description language or BOTH")
+    parser.add_argument("--dry-run", action="store_true", help="Print mapping only; don't call Shopify API")
     args = parser.parse_args()
 
     base_dir = os.path.dirname(__file__)
-    CSV_FILE = os.path.join(base_dir, args.csv)
-
-    if not os.path.exists(CSV_FILE):
-        raise FileNotFoundError(f"CSV file not found: {CSV_FILE}")
+    if args.csv_pos:
+        CSV_FILE = " ".join(args.csv_pos)
+    elif args.csv:
+        CSV_FILE = os.path.join(base_dir, args.csv) if not os.path.isabs(args.csv) else args.csv
+    else:
+        CSV_FILE = os.path.join(base_dir, "data", "test_create.csv")
+        if not os.path.exists(CSV_FILE):
+            CSV_FILE = os.path.join(base_dir, "test_create.csv")
+    title_lang = args.lang
+    dry_run = args.dry_run
 
     df = read_csv_auto(CSV_FILE)
     df.columns = df.columns.str.strip()
@@ -461,14 +575,67 @@ if __name__ == "__main__":
     print(f"Columns found: {df.columns.tolist()}")
     print(f"📋 {len(df)} rows to create")
 
-    success     = 0
-    failed      = 0
+    # Map common incoming column names to the script's expected columns
+    rename_map = {
+        "SKU": "Variant SKU",
+        "price": "Variant Price",
+        "Price": "Variant Price",
+        "qty": "Variant Inventory Qty",
+        "URL handle": "Handle",
+        "URL Handle": "Handle",
+        "Product image URL": "Image Src",
+        "Product Image URL": "Image Src",
+        "Image position": "Image position",
+        # keep Title_EN/Title_TH and description_en/description_th for language selection
+        "Title_EN": "Title_EN",
+        "Title_TH": "Title_TH",
+        "description_en": "description_en",
+        "description_th": "description_th",
+    }
+    df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
+
+    # Build Title and Body (HTML) based on preferred language
+    def pick_series(preferred, fallback=None):
+        if preferred in df.columns:
+            return df[preferred].fillna("")
+        if fallback and fallback in df.columns:
+            return df[fallback].fillna("")
+        if preferred in ("Title_EN", "Title_TH") and "Title" in df.columns:
+            return df["Title"].fillna("")
+        if preferred in ("description_en", "description_th") and "Body (HTML)" in df.columns:
+            return df["Body (HTML)"].fillna("")
+        return pd.Series([""] * len(df))
+
+    if title_lang == "TH":
+        df["Title"] = pick_series("Title_TH", "Title_EN")
+        df["Body (HTML)"] = pick_series("description_th", "description_en")
+    else:
+        df["Title"] = pick_series("Title_EN", "Title_TH")
+        df["Body (HTML)"] = pick_series("description_en", "description_th")
+
+    success = 0
+    failed = 0
     failed_rows = []
 
     for idx, row in df.iterrows():
         title = get_val(row, "Title") or "(no title)"
         sku   = get_val(row, "Variant SKU") or ""
         print(f"\n🔄 [{idx+1}/{len(df)}] Creating: {title} | SKU: {sku or '(no SKU)'}")
+
+        # Dry-run preview: don't call Shopify when requested
+        if dry_run:
+            payload_preview = {
+                "title": get_val(row, "Title"),
+                "descriptionHtml": get_val(row, "Body (HTML)"),
+                "handle": get_val(row, "Handle"),
+                "variant_sku": get_val(row, "Variant SKU"),
+                "variant_price": get_val(row, "Variant Price"),
+                "inventory_qty": get_val(row, "Variant Inventory Qty"),
+                "images": get_val(row, "Image Src"),
+                "metafields": build_metafields(row),
+            }
+            print(f"  🧾 DRY RUN preview: {payload_preview}")
+            continue
 
         # Step 1: Create product
         product = create_product(row, sku=sku)
@@ -478,6 +645,11 @@ if __name__ == "__main__":
             continue
 
         product_id         = product["id"]
+        if title_lang == "BOTH":
+            translations_created = create_thai_translations(product_id, row)
+            if translations_created:
+                print(f"  🈶 Thai translations created: {translations_created}")
+
         product_options    = product.get("options", [])
         default_variant_id = product.get("_default_variant_id")
 
@@ -487,8 +659,10 @@ if __name__ == "__main__":
         # Step 2b: Register Thai translations if provided
         register_thai_translations(product_id, row)
 
-        # Step 3: Publish to Online Store + Point of Sale
-        publish_product(product_id)
+        # Step 3: Publish to target channels (Online Store, Point of Sale, Inbox)
+        channels_val = get_val(row, "Sales Channels") or get_val(row, "Published Channels")
+        target_channels = [c.strip() for c in channels_val.split(",") if c.strip()] if channels_val else ["Online Store", "Point of Sale", "Inbox"]
+        publish_product(product_id, target_channels=target_channels)
 
         # Step 4: Add images
         add_images(product_id, row)

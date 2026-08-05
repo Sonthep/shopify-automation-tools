@@ -6,7 +6,7 @@
 var SHOPIFY_INV_CONFIG = {
   SHOP: "sevenfive-4062.myshopify.com",
   CLIENT_ID: "696e1e9162c702cc07c2f94a1beacf8a",
-  CLIENT_SECRET: "xxxxxxxxxxxxxxxxxxx",
+  CLIENT_SECRET: "YOUR_CLIENT_SECRET",
   TARGET_SHEET_NAME: "Inventory",
   LOG_SHEET_NAME: "Log run script",
   BATCH_SIZE: 25,
@@ -20,9 +20,9 @@ var SHOPIFY_INV_CONFIG = {
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('📦 Inventory Update Tools')
-    .addItem('🚀 1. อัปเดตสต็อกแบบเร็วที่สุด (Bulk Mutation - รวดเดียวเสร็จใน 5 วินาที)', 'updateInventoryBulkMutation')
+    .addItem('🚀 1. อัปเดตเฉพาะ check update = FALSE (Bulk Mutation)', 'updateInventoryBulkMutation')
     .addSeparator()
-    .addItem('2. อัปเดตสต็อกแบบ Direct Batch (25 รายการ/Request)', 'updateInventoryDirectBatch')
+    .addItem('2. อัปเดตเฉพาะ check update = FALSE (Direct Batch)', 'updateInventoryDirectBatch')
     .addToUi();
 }
 
@@ -74,22 +74,40 @@ function updateInventoryBulkMutation() {
   const rows = data.slice(1);
   
   const qtyIdx = findColIndex_(headers, ["Inventory quantity", "InventoryQuantity", "quantity", "จำนวนสต็อก", "จำนวน"]);
+  const checkIdx = findColIndex_(headers, ["check update", "Check Update", "check_update"]);
   const invItemIdx = findColIndex_(headers, ["Inventory Item ID", "InventoryItemID", "inventory_item_id"]);
-  
-  // ตำแหน่งมาตรฐาน: Col C = Inventory quantity (2), Col D = Inventory Item ID (3)
-  const colQty = qtyIdx !== -1 ? qtyIdx : 2;
-  const colInvItem = invItemIdx !== -1 ? invItemIdx : 3;
-  
+
+  // ป้องกันการอ่านผิดคอลัมน์: ต้องพบ Header ครบทั้ง 3 คอลัมน์
+  if (qtyIdx === -1 || checkIdx === -1 || invItemIdx === -1) {
+    const missing = [];
+    if (qtyIdx === -1) missing.push("Inventory quantity");
+    if (checkIdx === -1) missing.push("check update");
+    if (invItemIdx === -1) missing.push("Inventory Item ID");
+
+    const headerErr = `❌ ไม่พบหัวคอลัมน์: ${missing.join(", ")}`;
+    Logger.log(headerErr);
+    writeInventoryRunLog_(SHOPIFY_INV_CONFIG.TARGET_SHEET_NAME, rows.length, 0, rows.length, headerErr);
+    return;
+  }
+
   const jsonlLines = [];
-  let skipped = 0;
-  
-  rows.forEach(row => {
-    const invItemId = String(row[colInvItem] || "").trim();
-    const qtyRaw = row[colQty];
+  let skippedNotFalse = 0;
+  let skippedInvalid = 0;
+
+  rows.forEach((row, index) => {
+    // อัปเดตเฉพาะแถวที่ check update เป็น FALSE เท่านั้น
+    if (!isFalseValue_(row[checkIdx])) {
+      skippedNotFalse++;
+      return;
+    }
+
+    const invItemId = String(row[invItemIdx] || "").trim();
+    const qtyRaw = row[qtyIdx];
     const qtyNum = parseInt(qtyRaw, 10);
-    
+
     if (!invItemId || invItemId.indexOf("gid://shopify/InventoryItem/") === -1 || isNaN(qtyNum)) {
-      skipped++;
+      skippedInvalid++;
+      Logger.log(`⚠️ ข้ามแถว ${index + 2}: Inventory Item ID หรือ Inventory quantity ไม่ถูกต้อง`);
       return;
     }
     
@@ -111,14 +129,16 @@ function updateInventoryBulkMutation() {
   });
   
   const totalItems = jsonlLines.length;
+  const totalSkipped = skippedNotFalse + skippedInvalid;
+
   if (totalItems === 0) {
-    const emptyMsg = "⚠️ ไม่พบรายการสต็อกที่สมบูรณ์ (ต้องมี Inventory Item ID และจำนวนสต็อกเป็นตัวเลข)";
+    const emptyMsg = `⚠️ ไม่พบรายการที่ต้องอัปเดต: ต้องเป็น check update = FALSE และมี Inventory Item ID/Inventory quantity ถูกต้อง`;
     Logger.log(emptyMsg);
-    writeInventoryRunLog_(SHOPIFY_INV_CONFIG.TARGET_SHEET_NAME, rows.length, 0, rows.length, emptyMsg);
+    writeInventoryRunLog_(SHOPIFY_INV_CONFIG.TARGET_SHEET_NAME, rows.length, 0, totalSkipped, emptyMsg);
     return;
   }
-  
-  Logger.log(`📊 รวมข้อมูลสต็อก JSONL พร้อมส่ง: ${totalItems} รายการ (ข้าม ${skipped} รายการที่ไม่สมบูรณ์)`);
+
+  Logger.log(`📊 พบ check update = FALSE ที่พร้อมส่ง ${totalItems} รายการ | ไม่ใช่ FALSE ${skippedNotFalse} รายการ | ข้อมูลไม่สมบูรณ์ ${skippedInvalid} รายการ`);
   
   // 3. ขอ Staged Upload Target จาก Shopify
   const stageMutation = `mutation {
@@ -189,7 +209,7 @@ function updateInventoryBulkMutation() {
     } else if (bulkOp) {
       const successMsg = `🚀 สั่งคำสั่ง Bulk Operation อัปเดตสต็อกสำเร็จ! (ID: ${bulkOp.id}, Status: ${bulkOp.status}) ทั้งหมด ${totalItems} รายการกำลังอัปเดตบน Shopify Cloud`;
       Logger.log(successMsg);
-      writeInventoryRunLog_(SHOPIFY_INV_CONFIG.TARGET_SHEET_NAME, rows.length, totalItems, skipped, successMsg);
+      writeInventoryRunLog_(SHOPIFY_INV_CONFIG.TARGET_SHEET_NAME, rows.length, totalItems, totalSkipped, successMsg);
     }
   } else {
     const errRunFail = "❌ ไม่สามารถเริ่ม Bulk Operation สำหรับสต็อกได้";
@@ -240,31 +260,57 @@ function updateInventoryDirectBatch() {
   const rows = data.slice(1);
   
   const qtyIdx = findColIndex_(headers, ["Inventory quantity", "InventoryQuantity", "quantity", "จำนวนสต็อก"]);
+  const checkIdx = findColIndex_(headers, ["check update", "Check Update", "check_update"]);
   const invItemIdx = findColIndex_(headers, ["Inventory Item ID", "InventoryItemID", "inventory_item_id"]);
-  
-  const colQty = qtyIdx !== -1 ? qtyIdx : 2;
-  const colInvItem = invItemIdx !== -1 ? invItemIdx : 3;
-  
+
+  // ป้องกันการอ่านผิดคอลัมน์: ต้องพบ Header ครบทั้ง 3 คอลัมน์
+  if (qtyIdx === -1 || checkIdx === -1 || invItemIdx === -1) {
+    const missing = [];
+    if (qtyIdx === -1) missing.push("Inventory quantity");
+    if (checkIdx === -1) missing.push("check update");
+    if (invItemIdx === -1) missing.push("Inventory Item ID");
+
+    const headerErr = `❌ ไม่พบหัวคอลัมน์: ${missing.join(", ")}`;
+    Logger.log(headerErr);
+    writeInventoryRunLog_(SHOPIFY_INV_CONFIG.TARGET_SHEET_NAME, rows.length, 0, rows.length, headerErr);
+    return;
+  }
+
   const pendingItems = [];
-  let skipped = 0;
-  
-  rows.forEach(row => {
-    const invItemId = String(row[colInvItem] || "").trim();
-    const qtyNum = parseInt(row[colQty], 10);
-    
-    if (!invItemId || invItemId.indexOf("gid://shopify/InventoryItem/") === -1 || isNaN(qtyNum)) {
-      skipped++;
+  let skippedNotFalse = 0;
+  let skippedInvalid = 0;
+
+  rows.forEach((row, index) => {
+    // อัปเดตเฉพาะแถวที่ check update เป็น FALSE เท่านั้น
+    if (!isFalseValue_(row[checkIdx])) {
+      skippedNotFalse++;
       return;
     }
-    
+
+    const invItemId = String(row[invItemIdx] || "").trim();
+    const qtyNum = parseInt(row[qtyIdx], 10);
+
+    if (!invItemId || invItemId.indexOf("gid://shopify/InventoryItem/") === -1 || isNaN(qtyNum)) {
+      skippedInvalid++;
+      Logger.log(`⚠️ ข้ามแถว ${index + 2}: Inventory Item ID หรือ Inventory quantity ไม่ถูกต้อง`);
+      return;
+    }
+
     pendingItems.push({
       inventoryItemId: invItemId,
       locationId: locationId,
       quantity: qtyNum
     });
   });
-  
-  Logger.log(`📊 พบรายการที่จะอัปเดตสต็อก: ${pendingItems.length} รายการ (ข้าม ${skipped} รายการที่ไม่สมบูรณ์)`);
+
+  Logger.log(`📊 พบ check update = FALSE ที่จะอัปเดต ${pendingItems.length} รายการ | ไม่ใช่ FALSE ${skippedNotFalse} รายการ | ข้อมูลไม่สมบูรณ์ ${skippedInvalid} รายการ`);
+
+  if (pendingItems.length === 0) {
+    const emptyMsg = "⚠️ ไม่มีรายการ check update = FALSE ที่พร้อมอัปเดต";
+    Logger.log(emptyMsg);
+    writeInventoryRunLog_(SHOPIFY_INV_CONFIG.TARGET_SHEET_NAME, rows.length, 0, skippedNotFalse + skippedInvalid, emptyMsg);
+    return;
+  }
   
   let totalSuccess = 0;
   let totalFailed = 0;
@@ -283,8 +329,8 @@ function updateInventoryDirectBatch() {
     }
   }
   
-  totalFailed += skipped;
-  const statusMsg = `อัปเดตสต็อกสำเร็จ ${totalSuccess}/${pendingItems.length} รายการ (ข้าม/ล้มเหลว ${totalFailed} รายการ)`;
+  totalFailed += skippedInvalid;
+  const statusMsg = `อัปเดตเฉพาะ check update = FALSE สำเร็จ ${totalSuccess}/${pendingItems.length} รายการ | ล้มเหลว/ข้อมูลไม่ครบ ${totalFailed} | ข้ามเพราะไม่ใช่ FALSE ${skippedNotFalse}`;
   Logger.log(statusMsg);
   
   writeInventoryRunLog_(SHOPIFY_INV_CONFIG.TARGET_SHEET_NAME, rows.length, totalSuccess, totalFailed, statusMsg);
@@ -377,6 +423,14 @@ function findColIndex_(headers, candidates) {
     }
   }
   return -1;
+}
+
+/**
+ * รองรับทั้ง Boolean FALSE จากสูตรในชีต และข้อความ "FALSE"
+ * ค่าว่างหรือค่าอื่นจะไม่ถูกนำไปอัปเดต
+ */
+function isFalseValue_(value) {
+  return value === false || String(value).trim().toUpperCase() === "FALSE";
 }
 
 // ============================================================

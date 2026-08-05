@@ -120,6 +120,25 @@ py delete.py
 
 ---
 
+### `export_image_vendor.py` — ดึงรูปภาพ Collection ของ Vendor (Collection Logo/Header Image)
+ดึงรูปภาพของ Collection ที่เป็น Vendor (มีเงื่อนไข `Vendor is equal to ...`) ออกมาเป็น Excel/CSV หรือดาวน์โหลดไฟล์รูปภาพลงเครื่อง
+
+```bash
+# ดึงรูป Collection ของ Vendor ทั้งหมด
+py images/export_image_vendor.py
+
+# กรองเฉพาะ Vendor ที่ต้องการ (เช่น PRIMO หรือ Sirman)
+py images/export_image_vendor.py --vendor "PRIMO"
+
+# ดาวน์โหลดไฟล์รูปภาพลงโฟลเดอร์ในเครื่องด้วย (--download)
+py images/export_image_vendor.py --download
+
+# กรองเฉพาะ Collection ที่มีรูปภาพเท่านั้น
+py images/export_image_vendor.py --no-empty
+```
+
+---
+
 ## Workflow ทั่วไป
 
 ```

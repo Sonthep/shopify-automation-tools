@@ -100,25 +100,46 @@ def delete_media(product_gid, media_ids):
 
 # ── Create new media ──────────────────────────────────────────
 def create_media(product_gid, image_urls):
-    media_input = [
-        {"originalSource": url, "mediaContentType": "IMAGE"}
-        for url in image_urls
-    ]
+    # Use productSet to replace the product's files list in the exact order provided.
+    # FileSetInput.originalSource accepts either an external URL or a staged upload resourceUrl.
+    files_input = []
+    for url in image_urls:
+        # Derive a filename from the URL for nicer file names (query string removed)
+        fname = os.path.basename(url.split("?")[0]) or "file"
+        files_input.append({"originalSource": url, "filename": fname})
+
     mutation = """
-    mutation createMedia($productId: ID!, $media: [CreateMediaInput!]!) {
-      productCreateMedia(productId: $productId, media: $media) {
-        media { id status }
-        userErrors { field message }
+    mutation productSet($input: ProductSetInput!, $synchronous: Boolean!) {
+      productSet(input: $input, synchronous: $synchronous) {
+        product {
+          id
+          media(first: 50) { edges { node { id } } }
+        }
+        productSetOperation { id status userErrors { code field message } }
+        userErrors { code field message }
       }
     }"""
-    body   = gql(API_URL, HEADERS, mutation, {"productId": product_gid, "media": media_input})
+
+    variables = {"input": {"id": product_gid, "files": files_input}, "synchronous": True}
+    body = gql(API_URL, HEADERS, mutation, variables)
     if not body:
         return
-    result = body.get("data", {}).get("productCreateMedia", {})
-    if result.get("userErrors"):
-        print(f"  ⚠️ Create errors: {result['userErrors']}")
+    result = body.get("data", {}).get("productSet", {})
+    user_errors = result.get("userErrors", [])
+    if user_errors:
+        print(f"  ⚠️ productSet errors: {user_errors}")
+        return
+
+    product = result.get("product")
+    if product:
+        edges = product.get("media", {}).get("edges", [])
+        print(f"  ✅ Set {len(edges)} media (order preserved)")
     else:
-        print(f"  ✅ Created {len(result.get('media', []))} media")
+        op = result.get("productSetOperation")
+        if op:
+            print(f"  ✅ productSet operation: {op.get('id')} status={op.get('status')}")
+        else:
+            print("  ✅ productSet completed")
 
 
 # ── Folder mode: scan folder, match filename → SKU ───────────
@@ -247,39 +268,82 @@ if __name__ == "__main__":
     df = read_csv_auto(CSV_FILE)
     print(f"Columns found: {df.columns.tolist()}")
 
-    sku_col = "Variant SKU" if "Variant SKU" in df.columns else "sku"
-    img_col = "Image Src"   if "Image Src"   in df.columns else "image_src"
+    sku_col = "Variant SKU" if "Variant SKU" in df.columns else ("sku" if "sku" in df.columns else None)
+    img_col = "Image Src"   if "Image Src"   in df.columns else ("image_src" if "image_src" in df.columns else None)
 
-    if sku_col not in df.columns or img_col not in df.columns:
+    # detect a provided product GID column to allow skipping SKU lookups
+    gid_candidates = ["Product GID", "product_gid", "product id", "product_id", "gid"]
+    gid_col = next((c for c in gid_candidates if c in df.columns), None)
+
+    if not img_col or img_col not in df.columns or (not sku_col and not gid_col):
         print(f"❌ Required columns not found. Available: {df.columns.tolist()}")
         exit(1)
 
-    # กรองเฉพาะ row ที่มีทั้ง SKU และ Image Src
-    df = df[[sku_col, img_col]].dropna()
-    # รองรับหลาย URL ต่อ SKU (comma-separated)
+    # keep only columns that exist and are relevant
+    cols = [img_col]
+    if sku_col and sku_col in df.columns:
+        cols.insert(0, sku_col)
+    if gid_col:
+        cols.insert(0, gid_col)
+    df = df[cols].copy()
+
+    # drop rows without image
+    df = df[df[img_col].notna()].copy()
+
+    # drop rows where both gid and sku are missing
+    if gid_col:
+        if sku_col and sku_col in df.columns:
+            df = df[~(df[gid_col].isna() & df[sku_col].isna())]
+        else:
+            df = df[~df[gid_col].isna()]
+    else:
+        df = df.dropna(subset=[sku_col])
+
+    # รองรับหลาย URL ต่อ SKU/Product (comma-separated)
     df[img_col] = df[img_col].str.strip()
 
-    skus = df[sku_col].tolist()
-    print(f"📋 {len(skus)} SKUs to process")
+    # Build list of SKUs that still need GID lookup (rows where gid is empty)
+    skus_to_lookup = []
+    if gid_col and gid_col in df.columns:
+        if sku_col and sku_col in df.columns:
+            skus_to_lookup = df.loc[df[gid_col].isna(), sku_col].dropna().tolist()
+        else:
+            skus_to_lookup = []
+    else:
+        skus_to_lookup = df[sku_col].dropna().tolist()
 
-    gid_map = get_product_gids_by_skus(API_URL, HEADERS, skus)
+    print(f"📋 {len(df)} rows to process (need to lookup {len(skus_to_lookup)} SKUs)")
+
+    gid_map = {}
+    if skus_to_lookup:
+        gid_map = get_product_gids_by_skus(API_URL, HEADERS, skus_to_lookup)
 
     success = 0
     failed  = 0
 
     for _, row in df.iterrows():
-        sku = row[sku_col]
-        gid = gid_map.get(sku)
+        # Safely extract SKU if present
+        sku = None
+        if sku_col and sku_col in row.index and pd.notna(row[sku_col]):
+            sku = row[sku_col]
+
+        # Prefer explicit product GID from CSV when provided
+        gid = None
+        if gid_col and gid_col in row.index and pd.notna(row[gid_col]):
+            gid = row[gid_col]
+        else:
+            gid = gid_map.get(sku) if sku else None
 
         if not gid:
-            print(f"⚠️ SKU not found: {sku}")
+            print(f"⚠️ Product GID/SKU not found (sku={sku})")
             failed += 1
             continue
 
         # รองรับหลาย URL ต่อ 1 product (comma-separated)
         image_urls = [u.strip() for u in str(row[img_col]).split(",") if u.strip()]
 
-        print(f"\n🔄 {sku} → {gid}")
+        display = sku if sku else gid
+        print(f"\n🔄 {display} → {gid}")
         print(f"   Images: {image_urls}")
 
         # 1. ดึง media เก่า

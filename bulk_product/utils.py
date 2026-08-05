@@ -42,13 +42,18 @@ def gql(api_url: str, headers: dict, query: str, variables: dict = None) -> dict
 
 
 def get_val(row: pd.Series, col: str) -> str | None:
-    """Safely get a string value from a DataFrame row, returns None if missing/NaN."""
+    """Safely get a string value from a DataFrame row.
+
+    If the column exists, always return a string (empty string for blank/NaN)
+    so blank CSV cells can be distinguished from a missing column.
+    Returns None only when the requested column is not present.
+    """
     if col not in row.index:
         return None
     val = row[col]
     if pd.isna(val):
-        return None
-    return str(val).strip() or None
+        return ""
+    return str(val).strip()
 
 
 def read_csv_auto(path: str, **kwargs) -> pd.DataFrame:

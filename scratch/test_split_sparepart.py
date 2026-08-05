@@ -6,11 +6,14 @@ def test_split_formulas():
         [6894, "HOB2-477016-126", 500, 450]
     ]
 
-    export_id = "1hfHjhC7WdjVDT7qHt19PL8AnxlhTJ6rbbh-N4UBQJBA"
-    export_range = "Products Export!A:D"
+    gid_map = {
+        141756: ("gid://shopify/Product/8643904372935", "gid://shopify/ProductVariant/46276274946247"),
+        6573: ("gid://shopify/Product/8644289495239", "gid://shopify/ProductVariant/46277159190727"),
+        6894: ("gid://shopify/Product/8643733782727", "gid://shopify/ProductVariant/46276010180807")
+    }
 
-    no_disc_headers = [headers[0], headers[1], "Price", "Product GID", "Variant GID"]
-    with_disc_headers = [headers[0], headers[1], "Compare-at price", headers[3], "Product GID", "Variant GID"]
+    no_disc_headers = [headers[0], headers[1], "Price", "price website", "check price update", "Product GID", "Variant GID"]
+    with_disc_headers = [headers[0], headers[1], "Compare At Price", "Price", "Compare At Price Website", "Price Website", "check Compare-at price update", "check price update", "Product GID", "Variant GID"]
 
     no_disc_rows = [no_disc_headers]
     with_disc_rows = [with_disc_headers]
@@ -23,15 +26,13 @@ def test_split_formulas():
         price_web = float(row[3]) if row[3] else 0.0
         is_kit2 = "KIT2" in good_code
 
+        p_gid, v_gid = gid_map.get(row[0], ("", ""))
+
         if price_web == 0 or is_kit2:
-            p_f = f'=IFERROR(VLOOKUP(A{no_r}, IMPORTRANGE("{export_id}","{export_range}"), 3, FALSE), "")'
-            v_f = f'=IFERROR(VLOOKUP(A{no_r}, IMPORTRANGE("{export_id}","{export_range}"), 4, FALSE), "")'
-            no_disc_rows.append([row[0], row[1], row[2], p_f, v_f])
+            no_disc_rows.append([row[0], row[1], row[2], f"=VLOOKUP(A{no_r},'price website'!A:E,5,false)", f"=C{no_r}=D{no_r}", p_gid, v_gid])
             no_r += 1
         else:
-            p_f = f'=IFERROR(VLOOKUP(A{with_r}, IMPORTRANGE("{export_id}","{export_range}"), 3, FALSE), "")'
-            v_f = f'=IFERROR(VLOOKUP(A{with_r}, IMPORTRANGE("{export_id}","{export_range}"), 4, FALSE), "")'
-            with_disc_rows.append([row[0], row[1], row[2], row[3], p_f, v_f])
+            with_disc_rows.append([row[0], row[1], row[2], row[3], f"=VLOOKUP(A{with_r},'price website'!A:G,6,false)", f"=VLOOKUP(A{with_r},'price website'!A:G,5,false)", f"=C{with_r}=E{with_r}", f"=D{with_r}=F{with_r}", p_gid, v_gid])
             with_r += 1
 
     print("=== update_no_discount ===")

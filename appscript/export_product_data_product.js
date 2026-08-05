@@ -1,5 +1,3 @@
-
-
 // ============================================================
 // CONFIG
 // ============================================================
@@ -7,29 +5,28 @@ var SHOP = PropertiesService.getScriptProperties().getProperty("SHOP") || "seven
 var CLIENT_ID = PropertiesService.getScriptProperties().getProperty("CLIENT_ID") || "696e1e9162c702cc07c2f94a1beacf8a";
 var CLIENT_SECRET = PropertiesService.getScriptProperties().getProperty("CLIENT_SECRET") || "YOUR_CLIENT_SECRET";
 // ============================================================
-var EXPORT_SHEET_NAME = "Products Export";
+var EXPORT_SHEET_NAME = "web sevenfive data";
 var POLL_INTERVAL_MS = 10000; // เช็คสถานะทุกๆ 10 วินาที
 
 // Keys สำหรับเก็บ Token ลง Properties
 var PROP_ACCESS_TOKEN = "ACCESS_TOKEN";
 var PROP_TOKEN_EXPIRY = "TOKEN_EXPIRY";
-var PROP_LAST_BULK_OP_ID = "LAST_BULK_OP_ID";
+var PROP_LAST_BULK_OP_ID = "LAST_BULK_OP_ID_PRODUCT_DATA";
 
 // ============================================================
 // UI MENU
 // ============================================================
-// function onOpen() {
-//   const ui = SpreadsheetApp.getUi();
-//   ui.createMenu('📦 Shopify Tools')
-//     .addItem('1. Export Products to Sheet', 'exportProductsToSheet')
-//     .addItem('2. Clean HTML in Sheet', 'cleanHtmlInSheet')
-//     .addToUi();
-// }
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu('📦 Shopify Tools')
+    .addItem('Export Product Data (สินค้า)', 'exportProductDataProduct')
+    .addToUi();
+}
 
 // ============================================================
 // MAIN FUNCTION
 // ============================================================
-function exportProductsToSheet() {
+function exportProductDataProduct() {
   const props = PropertiesService.getScriptProperties();
   const savedOpId = props.getProperty(PROP_LAST_BULK_OP_ID);
   
@@ -39,12 +36,11 @@ function exportProductsToSheet() {
   
   // === Case 1: Shopify ทำไฟล์เสร็จเรียบร้อย (COMPLETED) → ดาวน์โหลดและเขียนลง Sheet ทันที ===
   if (currentOp && currentOp.status === "COMPLETED" && currentOp.url) {
-    // ตรวจสอบว่าเป็น op ที่สร้างไว้ล่าหรือเป็น op ใหม่ที่เสร็จแล้ว
     if (savedOpId === currentOp.id || savedOpId) {
       Logger.log("✅ Bulk op COMPLETED (" + currentOp.objectCount + " objects) — downloading now...");
-      props.deleteProperty(PROP_LAST_BULK_OP_ID); // ลบค่าค้างเพื่อไม่ให้ดึงไฟล์เดิมซ้ำ
+      props.deleteProperty(PROP_LAST_BULK_OP_ID);
       downloadAndProcessJSONL_(currentOp.url);
-      showAlert_("✅ Export สำเร็จ! " + currentOp.objectCount + " รายการ");
+      showAlert_("✅ Export Product Data (สินค้า) สำเร็จ! " + currentOp.objectCount + " รายการ");
       return;
     }
   }
@@ -57,11 +53,11 @@ function exportProductsToSheet() {
     return;
   }
   
-  // === Case 3: ยังไม่มี op ใหม่ → สั่งเริ่ม Bulk Query แล้วจบฟังก์ชันทันที (ไม่นอนรอ เพื่อไม่ให้โดนตัด 6 นาที) ===
+  // === Case 3: ยังไม่มี op ใหม่ → สั่งเริ่ม Bulk Query แล้วจบฟังก์ชันทันที ===
   if (currentOp && currentOp.status === "COMPLETED") {
-    Logger.log("Old COMPLETED op (" + currentOp.objectCount + " objects) — starting FRESH query for latest data...");
+    Logger.log("Old COMPLETED op (" + currentOp.objectCount + " objects) — starting FRESH query for product data...");
   } else {
-    Logger.log("Starting a new bulk query...");
+    Logger.log("Starting a new bulk query for products (custom.spapart_or_product: สินค้า)...");
   }
   
   const opId = startBulkQuery_();
@@ -77,47 +73,49 @@ function exportProductsToSheet() {
 
 // ============================================================
 // 1. START BULK QUERY
+// Filter เฉพาะ metafields.custom.spapart_or_product:สินค้า
 // ============================================================
 function startBulkQuery_() {
   const INNER_QUERY = `
 {
-  products {
+  products(query: "metafields.custom.spapart_or_product:สินค้า") {
     edges {
       node {
         id
-        handle
-        title
-        vendor
-        productType
-        tags
         status
-        publishedAt
+        descriptionHtml
         variants {
           edges {
             node {
               id
               sku
-              price
-              compareAtPrice
-              inventoryQuantity
-              inventoryItem { id }
-            }
-          }
-        }
-        images {
-          edges {
-            node {
-              id
-              url
             }
           }
         }
         metafields {
           edges {
             node {
+              id
               namespace
               key
               value
+            }
+          }
+        }
+        media {
+          edges {
+            node {
+              id
+              mediaContentType
+              ... on ExternalVideo {
+                originUrl
+                embedUrl
+              }
+              ... on Video {
+                sources {
+                  url
+                }
+              }
             }
           }
         }
@@ -125,7 +123,7 @@ function startBulkQuery_() {
     }
   }
 }
-  `;
+`;
 
   const BULK_MUTATION = `
 mutation BulkQuery($query: String!) {
@@ -134,84 +132,42 @@ mutation BulkQuery($query: String!) {
     userErrors { field message }
   }
 }
-  `;
+`;
 
-  const payload = {
+  const resData = callGraphQL_({
     query: BULK_MUTATION,
     variables: { query: INNER_QUERY }
-  };
+  });
 
-  const res = callGraphQL_(payload);
-  if (!res || !res.data || !res.data.bulkOperationRunQuery) {
-    Logger.log("[ERROR] Failed to start query: " + JSON.stringify(res));
+  if (!resData || !resData.data) {
+    Logger.log("[ERROR] startBulkQuery_ response invalid: " + JSON.stringify(resData));
     return null;
   }
-  
-  const opData = res.data.bulkOperationRunQuery;
-  if (opData.userErrors && opData.userErrors.length > 0) {
-    Logger.log("[ERROR] " + JSON.stringify(opData.userErrors));
+
+  const runResult = resData.data.bulkOperationRunQuery;
+  if (runResult.userErrors && runResult.userErrors.length > 0) {
+    Logger.log("[ERROR] userErrors: " + JSON.stringify(runResult.userErrors));
     return null;
   }
-  
-  return opData.bulkOperation.id;
+
+  return runResult.bulkOperation ? runResult.bulkOperation.id : null;
 }
 
 // ============================================================
 // 2. POLL STATUS
 // ============================================================
-function pollStatus_(bulkOperationId, maxPollTimeMs) {
-  maxPollTimeMs = maxPollTimeMs || 300000; // default 5 นาที
-  const POLL_QUERY = `
-    query GetBulkOperation($id: ID!) {
-      node(id: $id) {
-        ... on BulkOperation {
-          id
-          status
-          errorCode
-          objectCount
-          url
-        }
-      }
-    }
-  `;
-  const payload = {
-    query: POLL_QUERY,
-    variables: { id: bulkOperationId }
-  };
+function pollStatus_(opId) {
+  const query = `{ node(id: "${opId}") { ... on BulkOperation { id status url errorCode createdAt completedAt objectCount fileSize } } }`;
+  const resData = callGraphQL_({ query: query });
   
-  const startTime = Date.now();
-  
-  while (true) {
-    const res = callGraphQL_(payload);
-    const op = (res && res.data && res.data.node) ? res.data.node : null;
-    
-    if (!op) {
-      Logger.log("[ERROR] Bulk operation not found for ID: " + bulkOperationId);
-      return { status: "NOT_FOUND" };
-    }
-    
-    Logger.log(`  [${op.status}] ${op.objectCount} objects`);
-    
-    if (op.status === "COMPLETED") {
-      return { status: "COMPLETED", url: op.url };
-    }
-    
-    if (op.status === "FAILED" || op.status === "CANCELED") {
-      Logger.log("[ERROR] Bulk operation failed: " + op.errorCode);
-      return { status: op.status, errorCode: op.errorCode };
-    }
-    
-    if (Date.now() - startTime > maxPollTimeMs) {
-      Logger.log("⏳ Polling paused (เกิน " + (maxPollTimeMs/60000).toFixed(1) + " นาที). Status: " + op.status);
-      return { status: op.status, objectCount: op.objectCount };
-    }
-    
-    Utilities.sleep(POLL_INTERVAL_MS);
+  if (resData && resData.data && resData.data.node) {
+    return resData.data.node;
   }
+  return { status: "UNKNOWN" };
 }
 
 // ============================================================
-// 3. DOWNLOAD & PROCESS JSONL (แบบทยอยโหลดทีละ 5MB แก้บัคตัดจบ)
+// 3. DOWNLOAD & PROCESS JSONL
 // ============================================================
 function downloadAndProcessJSONL_(url) {
   Logger.log("Downloading result in chunks to prevent timeout/truncation...");
@@ -219,10 +175,10 @@ function downloadAndProcessJSONL_(url) {
   const products = {};
   const variants = {};
   const meta = {};
-  const productImages = {};
+  const productVideos = {};
   
   let startByte = 0;
-  const CHUNK_SIZE = 5 * 1024 * 1024; // โหลดทีละ 5MB ป้องกัน Apps Script ค้าง
+  const CHUNK_SIZE = 5 * 1024 * 1024; // โหลดทีละ 5MB
   let totalLinesParsed = 0;
   
   while (true) {
@@ -249,11 +205,8 @@ function downloadAndProcessJSONL_(url) {
     let nextStart = startByte + bytes.length;
     
     if (code === 200) {
-      // Server ส่งไฟล์เต็มมาเลย (ไม่รองรับ Range) — โหลดครั้งเดียวจบ
       isDone = true;
     } else if (code === 206) {
-      // ตรวจสอบจาก Content-Range ว่าถึง Byte สุดท้ายของไฟล์แล้วหรือยัง
-      // Content-Range: bytes 0-5242879/10485660  →  ถ้า endByte received >= totalSize-1 แสดงว่าจบแล้ว
       const contentRange = res.getHeaders()["Content-Range"] || res.getHeaders()["content-range"] || "";
       let totalFileSize = -1;
       const crMatch = contentRange.match(/bytes\s+\d+-\d+\/(\d+)/);
@@ -262,26 +215,21 @@ function downloadAndProcessJSONL_(url) {
       const receivedEndByte = startByte + bytes.length - 1;
       
       if (totalFileSize > 0 && receivedEndByte >= totalFileSize - 1) {
-        // ได้รับ Byte สุดท้ายของไฟล์แล้ว
         isDone = true;
       } else if (bytes.length < CHUNK_SIZE) {
-        // Chunk ที่ได้น้อยกว่าที่ขอ = ไม่มีข้อมูลเหลือแล้ว
         isDone = true;
       } else {
-        // ยังมีข้อมูลต่อไป — ตัดที่ newline ตัวสุดท้ายเพื่อไม่ให้ JSON บรรทัดขาดครึ่ง
         const lastNewlineIndex = bytes.lastIndexOf(10);
         if (lastNewlineIndex !== -1) {
           validBytes = bytes.slice(0, lastNewlineIndex + 1);
-          nextStart = startByte + lastNewlineIndex + 1; // ยกยอด Byte ที่เหลือไปโหลดรอบถัดไป
+          nextStart = startByte + lastNewlineIndex + 1;
         }
       }
     }
     
-    // แปลง Byte Array เป็นข้อความ
     const chunkText = Utilities.newBlob(validBytes).getDataAsString();
     const lines = chunkText.split('\n');
     
-    // Parse JSON แต่ละบรรทัดใน Chunk นี้
     lines.forEach(line => {
       if (!line.trim()) return;
       totalLinesParsed++;
@@ -295,12 +243,24 @@ function downloadAndProcessJSONL_(url) {
         } else if (gid.indexOf("/ProductVariant/") !== -1 && parent) {
           if (!variants[parent]) variants[parent] = [];
           variants[parent].push(obj);
-        } else if ((gid.indexOf("/ProductImage/") !== -1 || gid.indexOf("/Image/") !== -1) && parent) {
-          if (!productImages[parent]) productImages[parent] = [];
-          productImages[parent].push(obj.url);
         } else if (obj.namespace && obj.key && parent) {
           if (!meta[parent]) meta[parent] = {};
           meta[parent][`${obj.namespace}.${obj.key}`] = obj.value;
+        } else if (parent && (obj.mediaContentType || gid.indexOf("/ExternalVideo/") !== -1 || gid.indexOf("/Video/") !== -1)) {
+          let videoUrl = "";
+          if (obj.originUrl) {
+            videoUrl = obj.originUrl;
+          } else if (obj.embedUrl) {
+            videoUrl = obj.embedUrl;
+          } else if (obj.sources && obj.sources.length > 0 && obj.sources[0].url) {
+            videoUrl = obj.sources[0].url;
+          }
+          if (videoUrl) {
+            if (!productVideos[parent]) productVideos[parent] = [];
+            if (productVideos[parent].indexOf(videoUrl) === -1) {
+              productVideos[parent].push(videoUrl);
+            }
+          }
         }
       } catch (e) {
         // Ignore parse error
@@ -313,43 +273,19 @@ function downloadAndProcessJSONL_(url) {
   
   Logger.log(`  ${totalLinesParsed} lines downloaded and parsed.`);
   
-  // Debug: แสดงจำนวน Object แต่ละประเภทที่ Parse ได้
-  const productCount = Object.keys(products).length;
-  const variantParentCount = Object.keys(variants).length;
-  const totalVariantCount = Object.values(variants).reduce((sum, arr) => sum + arr.length, 0);
-  const imageParentCount = Object.keys(productImages).length;
-  const metaParentCount = Object.keys(meta).length;
-  const productsWithNoVariants = Object.keys(products).filter(pid => !variants[pid]).length;
-  Logger.log(`  [DEBUG] Products parsed: ${productCount}`);
-  Logger.log(`  [DEBUG] Variants parsed: ${totalVariantCount} (from ${variantParentCount} parent products)`);
-  Logger.log(`  [DEBUG] Images parsed: ${imageParentCount} products with images`);
-  Logger.log(`  [DEBUG] Meta parsed: ${metaParentCount} objects with metafields`);
-  Logger.log(`  [DEBUG] Products with NO variants in JSONL: ${productsWithNoVariants}`);
-  if (productsWithNoVariants > 0) {
-    Logger.log(`  [DEBUG] These products will still get 1 empty row each (pVariants = [{}])`);
-  }
-  
   // ---------------------------------------------------------
-  // จัดเตรียมข้อมูลลง Google Sheet (เฉพาะ 17 Columns ที่กำหนด)
+  // จัดเตรียมข้อมูลลง Google Sheet ตาม Columns ที่กำหนด:
+  // custom.good_id, Variant SKU, Body (HTML), Status, media video, User Manual, Datasheet, LInk pdf
   // ---------------------------------------------------------
   const finalHeaders = [
     "custom.good_id",
     "Variant SKU",
-    "Product GID",
-    "Variant GID",
-    "Inventory Item ID",
-    "Handle",
-    "Title",
-    "Vendor",
-    "Type",
-    "Tags",
+    "Body (HTML)",
     "Status",
-    "Published",
-    "Price",
-    "Compare At Price",
-    "Inventory",
-    "Image Src",
-    "custom.spapart_or_product"
+    "media video",
+    "User Manual",
+    "Datasheet",
+    "LInk pdf"
   ];
   
   const allRowsData = [];
@@ -357,49 +293,45 @@ function downloadAndProcessJSONL_(url) {
   Object.keys(products).forEach(pid => {
     const p = products[pid];
     const mf = meta[pid] || {};
+    
+    // Double check filter: custom.spapart_or_product = "สินค้า"
+    const spVal = mf["custom.spapart_or_product"];
+    if (spVal && spVal !== "สินค้า") {
+      return;
+    }
+    
     const pVariants = variants[pid] || [{}];
+    const pVideos = productVideos[pid] || [];
+    const videoStr = pVideos.join(", ");
+    
+    // ดึง custom.good_id
+    let goodId = mf["custom.good_id"];
+    if (goodId != null && goodId !== "") {
+      let parsed = parseInt(goodId, 10);
+      goodId = isNaN(parsed) ? "" : parsed;
+    } else {
+      goodId = "";
+    }
+    
+    // ดึง User Manual, Datasheet และ Link PDF
+    const userManual = mf["custom.user_manual"] || mf["custom.manual"] || mf["custom.user_manual_url"] || "";
+    const datasheet = mf["custom.datasheet"] || mf["custom.datasheet_url"] || "";
+    const linkPdf = mf["custom.link_pdf"] || mf["custom.pdf_link"] || mf["custom.link_pdf_url"] || "";
+    const bodyHtml = p.descriptionHtml || "";
+    const status = p.status || "";
     
     pVariants.forEach(v => {
-      const vid = v.id || "";
-      const inv = (v.inventoryItem && v.inventoryItem.id) ? v.inventoryItem.id : "";
-      const vmf = meta[vid] || {};
-      const pImgs = productImages[pid] || [];
-      
+      const sku = v.sku || "";
       const rowObj = {
-        "Variant SKU": v.sku || "",
-        "Product GID": pid,
-        "Variant GID": vid,
-        "Inventory Item ID": inv,
-        "Handle": p.handle || "",
-        "Title": p.title || "",
-        "Vendor": p.vendor || "",
-        "Type": p.productType || "",
-        "Tags": (p.tags || []).join(", "),
-        "Status": p.status || "",
-        "Published": p.publishedAt ? "TRUE" : "FALSE",
-        "Price": v.price != null ? v.price : "",
-        "Compare At Price": v.compareAtPrice != null ? v.compareAtPrice : "",
-        "Inventory": v.inventoryQuantity != null ? v.inventoryQuantity : "",
-        "Image Src": pImgs.length > 0 ? pImgs[0] : ""
+        "custom.good_id": goodId,
+        "Variant SKU": sku,
+        "Body (HTML)": bodyHtml,
+        "Status": status,
+        "media video": videoStr,
+        "User Manual": userManual,
+        "Datasheet": datasheet,
+        "LInk pdf": linkPdf
       };
-      
-      // ดึง Metafields ที่สัมพันธ์กันเข้ามา
-      Object.assign(rowObj, mf);
-      Object.assign(rowObj, vmf);
-      
-      // จัดรูปแบบ custom.good_id
-      let goodId = rowObj["custom.good_id"];
-      if (goodId != null && goodId !== "") {
-        let parsed = parseInt(goodId, 10);
-        rowObj["custom.good_id"] = isNaN(parsed) ? "" : parsed;
-      } else {
-        rowObj["custom.good_id"] = "";
-      }
-      
-      // จัดรูปแบบ custom.spapart_or_product
-      if (rowObj["custom.spapart_or_product"] == null) {
-        rowObj["custom.spapart_or_product"] = "";
-      }
       
       allRowsData.push(rowObj);
     });
@@ -415,32 +347,28 @@ function downloadAndProcessJSONL_(url) {
   Logger.log(`  ${allRowsData.length} variant rows assembled.`);
   
   // ---------------------------------------------------------
-  // เขียนลง Sheet (ใช้ Sheets API service — ไม่ลบ sheet เพื่อไม่ให้ #REF!)
+  // เขียนลง Sheet (ใช้ Sheets API service)
   // ---------------------------------------------------------
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const ssId = ss.getId();
   let sheet = ss.getSheetByName(EXPORT_SHEET_NAME);
   
-  // สร้าง sheet ถ้ายังไม่มี
   if (!sheet) {
     sheet = ss.insertSheet(EXPORT_SHEET_NAME);
     SpreadsheetApp.flush();
   }
   
-  const targetRows = finalRows2D.length;  // รวม header 1 แถว
-  const targetCols = finalHeaders.length; // 17 cols
-  
+  const targetRows = finalRows2D.length;
+  const targetCols = finalHeaders.length;
   let usedSheetsApi = false;
   
   if (typeof Sheets !== "undefined") {
     try {
-      Logger.log("  Writing with Sheets API (fast path, 8K rows/batch)...");
+      Logger.log("  Writing with Sheets API...");
       const sheetId = sheet.getSheetId();
       
-      // 1. ล้างข้อมูลเดิมทั้งหมด (ไม่ลบ sheet → ไม่ #REF!)
       Sheets.Spreadsheets.Values.clear({}, ssId, EXPORT_SHEET_NAME);
       
-      // 2. ปรับแต่งชีต + เพิ่มแถวผ่าน Sheets API batchUpdate ทันทีในคำสั่งเดียว
       const currentMaxRows = sheet.getMaxRows();
       const requests = [
         {
@@ -448,16 +376,9 @@ function downloadAndProcessJSONL_(url) {
             properties: { sheetId: sheetId, gridProperties: { frozenRowCount: 1 } },
             fields: "gridProperties.frozenRowCount"
           }
-        },
-        {
-          repeatCell: {
-            range: { sheetId: sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: targetCols },
-            cell: { userEnteredFormat: { textFormat: { bold: true }, wrapStrategy: "CLIP" } },
-            fields: "userEnteredFormat(textFormat,wrapStrategy)"
-          }
         }
       ];
-
+      
       if (currentMaxRows < targetRows) {
         requests.push({
           appendDimension: {
@@ -467,94 +388,55 @@ function downloadAndProcessJSONL_(url) {
           }
         });
       }
-
+      
       Sheets.Spreadsheets.batchUpdate({ requests: requests }, ssId);
       
-      // 3. เขียน batch ละ 8,000 แถว (~2.7MB ต่อ request — ต่ำกว่า limit 10MB)
-      const API_BATCH_SIZE = 8000;
-      for (let i = 0; i < targetRows; i += API_BATCH_SIZE) {
-        const chunk = finalRows2D.slice(i, i + API_BATCH_SIZE);
+      const lastColLetter = String.fromCharCode(64 + targetCols);
+      const BATCH_SIZE_ROWS = 8000;
+      for (let i = 0; i < finalRows2D.length; i += BATCH_SIZE_ROWS) {
+        const chunk2D = finalRows2D.slice(i, i + BATCH_SIZE_ROWS);
         const startRow = i + 1;
+        const endRow = i + chunk2D.length;
+        const rangeStr = `${EXPORT_SHEET_NAME}!A${startRow}:${lastColLetter}${endRow}`;
+        
         Sheets.Spreadsheets.Values.update(
-          { values: chunk },
+          { values: chunk2D },
           ssId,
-          `${EXPORT_SHEET_NAME}!A${startRow}`,
+          rangeStr,
           { valueInputOption: "RAW" }
         );
-        Logger.log(`    Wrote rows ${startRow} – ${startRow + chunk.length - 1}`);
       }
       
       usedSheetsApi = true;
-      Logger.log("  Sheets API write complete.");
+      Logger.log(`  ✅ Done writing ${targetRows} rows with Sheets API.`);
     } catch (apiErr) {
-      Logger.log("  [WARN] Sheets API failed (" + apiErr.message + ") — falling back to setValues...");
+      Logger.log("  [WARN] Sheets API failed (" + apiErr.message + "), falling back to setValues...");
     }
   }
   
-  // Fallback: SpreadsheetApp.setValues() ถ้าไม่ได้เปิด Service หรือ API error
   if (!usedSheetsApi) {
-    Logger.log("  Writing with setValues (10K batch)...");
-    sheet.setRowHeight(1, 25);
+    sheet.clear();
+    const currentMaxRows = sheet.getMaxRows();
+    if (currentMaxRows < targetRows) {
+      sheet.insertRowsAfter(currentMaxRows, targetRows - currentMaxRows);
+    }
+    
+    const BATCH_SIZE_ROWS = 2000;
+    for (let i = 0; i < finalRows2D.length; i += BATCH_SIZE_ROWS) {
+      const chunk2D = finalRows2D.slice(i, i + BATCH_SIZE_ROWS);
+      const range = sheet.getRange(i + 1, 1, chunk2D.length, targetCols);
+      range.setValues(chunk2D);
+    }
     sheet.setFrozenRows(1);
-    sheet.clearContents();
-    const currentRows = sheet.getMaxRows();
-    if (currentRows < targetRows) {
-      sheet.insertRowsAfter(currentRows, targetRows - currentRows);
-    }
-    const WRITE_BATCH_SIZE = 10000;
-    for (let i = 0; i < targetRows; i += WRITE_BATCH_SIZE) {
-      const chunk = finalRows2D.slice(i, i + WRITE_BATCH_SIZE);
-      sheet.getRange(i + 1, 1, chunk.length, targetCols).setValues(chunk);
-    }
-    sheet.getRange(1, 1, 1, targetCols).setFontWeight("bold").setWrap(false);
-    SpreadsheetApp.flush();
+    Logger.log(`  ✅ Done writing ${targetRows} rows with setValues.`);
   }
   
-  Logger.log(`✅ ${allRowsData.length} products exported to sheet '${EXPORT_SHEET_NAME}' (Sheets API: ${usedSheetsApi})`);
+  // บันทึก Log ลงชีท "Logrun script"
   logToSheet_(allRowsData.length, usedSheetsApi);
 }
 
 // ============================================================
-// 4. CLEAN HTML IN SHEET (แยกรันทีหลัง จะได้ไม่ Timeout)
-// ============================================================
-function cleanHtmlInSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(EXPORT_SHEET_NAME);
-  if (!sheet) {
-    showAlert_("ไม่พบ Sheet: " + EXPORT_SHEET_NAME);
-    return;
-  }
-  
-  // หาว่าคอลัมน์ "Body (HTML)" อยู่ตำแหน่งไหน
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const colIndex = headers.indexOf("Body (HTML)");
-  
-  if (colIndex === -1) {
-    showAlert_("ไม่พบคอลัมน์ 'Body (HTML)'");
-    return;
-  }
-  
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return;
-  
-  // 1. โหลดข้อมูลมาแค่คอลัมน์เดียว (ทำงานไวมาก)
-  const range = sheet.getRange(2, colIndex + 1, lastRow - 1, 1);
-  const values = range.getValues();
-  
-  // 2. แปลง HTML ทุกบรรทัด
-  for (let i = 0; i < values.length; i++) {
-    if (values[i][0]) {
-      values[i][0] = stripHtml_(values[i][0]);
-    }
-  }
-  
-  // 3. เขียนข้อมูลที่แปลงแล้วกลับลงไป
-  range.setValues(values);
-  showAlert_("แปลง HTML เป็นข้อความปกติเรียบร้อยแล้ว!");
-}
-
-// ============================================================
-// HELPER: AUTH (Auto Refresh Token)
+// HELPER: GET ACCESS TOKEN
 // ============================================================
 function getAccessToken_() {
   const props  = PropertiesService.getScriptProperties();
@@ -613,17 +495,15 @@ function callGraphQL_(payload) {
   return JSON.parse(res.getContentText());
 }
 
-
-
 // ============================================================
-// HELPER: แสดง Alert อย่างปลอดภัย แม้ไม่ได้รันจากหน้าต่างชีตโดยตรง (เช่น รันผ่าน Editor)
+// HELPER: SHOW ALERT
 // ============================================================
 function showAlert_(message) {
   Logger.log("ALERT: " + message);
 }
 
 // ============================================================
-// HELPER: บันทึก Log ลงชีท "Logrun script"
+// HELPER: LOG TO SHEET "Logrun script"
 // ============================================================
 var LOG_SHEET_NAME = "Logrun script";
 
@@ -632,7 +512,6 @@ function logToSheet_(rowCount, usedSheetsApi) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let logSheet = ss.getSheetByName(LOG_SHEET_NAME);
     
-    // สร้าง sheet ถ้ายังไม่มี
     if (!logSheet) {
       logSheet = ss.insertSheet(LOG_SHEET_NAME);
       logSheet.getRange(1, 1, 1, 4).setValues([["Timestamp", "Status", "Rows Exported", "Write Method"]]);
@@ -644,7 +523,7 @@ function logToSheet_(rowCount, usedSheetsApi) {
     const timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
     const method = usedSheetsApi ? "Sheets API" : "setValues";
     
-    logSheet.appendRow([timestamp, "✅ Success", rowCount, method]);
+    logSheet.appendRow([timestamp, "✅ Product Data Success", rowCount, method]);
     Logger.log("[LOG] บันทึก Log ลงชีทเรียบร้อย: " + timestamp + " | " + rowCount + " rows");
   } catch (logErr) {
     Logger.log("[WARN] ไม่สามารถบันทึก Log ลงชีทได้: " + logErr.message);
