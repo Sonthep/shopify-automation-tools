@@ -4,7 +4,7 @@
 // CONFIG
 // ============================================================
 var SHOP = PropertiesService.getScriptProperties().getProperty("SHOP") || "sevenfive-4062.myshopify.com";
-var CLIENT_ID = PropertiesService.getScriptProperties().getProperty("CLIENT_ID") || "696e1e9162c702cc07c2f94a1beacf8a";
+var CLIENT_ID = PropertiesService.getScriptProperties().getProperty("CLIENT_ID") || "YOUR_CLIENT_ID";
 var CLIENT_SECRET = PropertiesService.getScriptProperties().getProperty("CLIENT_SECRET") || "YOUR_CLIENT_SECRET";
 // ============================================================
 var EXPORT_SHEET_NAME = "Products Export";
