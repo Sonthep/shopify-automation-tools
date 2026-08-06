@@ -1,21 +1,22 @@
 // ============================================================
-// SHOPIFY FULL PRODUCTS EXPORT (SELF-CONTAINED MODULE)
+// SHOPIFY PRODUCT SCANNER EXPORT (SELF-CONTAINED MODULE)
+// Target Columns: custom.good_id, Variant SKU, Title, Price, include vat 7%, vendor, Image URL, Handle
 // ============================================================
 
-function exportProductsToSheet() {
-  // 1. CONFIG & CONSTANTS (Scoped strictly inside exportProductsToSheet)
+function exportDataWebsiteProductScanner() {
+  // 1. CONFIG & CONSTANTS
   const SHOP = PropertiesService.getScriptProperties().getProperty("SHOP") || "sevenfive-4062.myshopify.com";
   const CLIENT_ID = PropertiesService.getScriptProperties().getProperty("CLIENT_ID") || "696e1e9162c702cc07c2f94a1beacf8a";
   const CLIENT_SECRET = PropertiesService.getScriptProperties().getProperty("CLIENT_SECRET") || "YOUR_CLIENT_SECRET";
-  const EXPORT_SHEET_NAME = "Products Export";
+  const EXPORT_SHEET_NAME = "Products2";
   const LOG_SHEET_NAME = "Logrun script";
   const POLL_INTERVAL_MS = 10000;
 
   const PROP_ACCESS_TOKEN = "ACCESS_TOKEN";
   const PROP_TOKEN_EXPIRY = "TOKEN_EXPIRY";
-  const PROP_LAST_BULK_OP_ID = "LAST_BULK_OP_ID_FULL";
+  const PROP_LAST_BULK_OP_ID = "LAST_BULK_OP_ID_SCANNER";
 
-  // 2. INNER HELPERS (Zero global leakage)
+  // 2. INNER HELPERS
   function getAccessToken() {
     const props = PropertiesService.getScriptProperties();
     const token = props.getProperty(PROP_ACCESS_TOKEN);
@@ -70,26 +71,18 @@ function exportProductsToSheet() {
   function startBulkQuery() {
     const INNER_QUERY = `
 {
-  products {
+  products(query: "metafields.custom.spapart_or_product:สินค้า") {
     edges {
       node {
         id
         handle
         title
         vendor
-        productType
-        tags
-        status
-        publishedAt
         variants {
           edges {
             node {
               id
               sku
-              price
-              compareAtPrice
-              inventoryQuantity
-              inventoryItem { id }
             }
           }
         }
@@ -200,43 +193,59 @@ mutation BulkQuery($query: String!) {
     
     Logger.log(`  ${totalLinesParsed} total JSONL lines downloaded and parsed.`);
     
+    // เรียงลำดับ Column ตามสั่ง: custom.good_id, SKU, Title, Price, include vat 7%, vendor, Image URL, Handle
     const finalHeaders = [
-      "custom.good_id", "Variant SKU", "Product GID", "Variant GID", "Inventory Item ID",
-      "Handle", "Title", "Vendor", "Type", "Tags", "Status", "Published",
-      "Price", "Compare At Price", "Inventory", "Image Src", "custom.spapart_or_product"
+      "custom.good_id",
+      "SKU",
+      "Title",
+      "Price",
+      "include vat 7%",
+      "vendor",
+      "Image URL",
+      "Handle"
     ];
     
     const allRowsData = [];
     Object.keys(products).forEach(pid => {
-      const p = products[pid], mf = meta[pid] || {}, pVariants = variants[pid] || [{}];
+      const p = products[pid];
+      const mf = meta[pid] || {};
+      
+      const spVal = mf["custom.spapart_or_product"];
+      if (spVal && spVal !== "สินค้า") return;
+      
+      const pVariants = variants[pid] || [{}];
+      const pImgs = productImages[pid] || [];
+      const imageUrl = pImgs.length > 0 ? pImgs[0] : "";
+      
+      let rawGoodId = mf["custom.good_id"];
+      let goodId = "";
+      if (rawGoodId != null && rawGoodId !== "") {
+        let parsed = parseInt(rawGoodId, 10);
+        goodId = isNaN(parsed) ? "" : parsed;
+      }
       
       pVariants.forEach(v => {
         const vid = v.id || "";
-        const inv = (v.inventoryItem && v.inventoryItem.id) ? v.inventoryItem.id : "";
-        const vmf = meta[vid] || {}, pImgs = productImages[pid] || [];
+        const vmf = meta[vid] || {};
         
-        const rowObj = {
-          "Variant SKU": v.sku || "", "Product GID": pid, "Variant GID": vid,
-          "Inventory Item ID": inv, "Handle": p.handle || "", "Title": p.title || "",
-          "Vendor": p.vendor || "", "Type": p.productType || "", "Tags": (p.tags || []).join(", "),
-          "Status": p.status || "", "Published": p.publishedAt ? "TRUE" : "FALSE",
-          "Price": v.price != null ? v.price : "", "Compare At Price": v.compareAtPrice != null ? v.compareAtPrice : "",
-          "Inventory": v.inventoryQuantity != null ? v.inventoryQuantity : "",
-          "Image Src": pImgs.length > 0 ? pImgs[0] : ""
-        };
-        
-        Object.assign(rowObj, mf);
-        Object.assign(rowObj, vmf);
-        
-        let goodId = rowObj["custom.good_id"];
-        if (goodId != null && goodId !== "") {
-          let parsed = parseInt(goodId, 10);
-          rowObj["custom.good_id"] = isNaN(parsed) ? "" : parsed;
-        } else {
-          rowObj["custom.good_id"] = "";
+        let variantGoodId = vmf["custom.good_id"];
+        let finalGoodId = goodId;
+        if (variantGoodId != null && variantGoodId !== "") {
+          let parsedV = parseInt(variantGoodId, 10);
+          if (!isNaN(parsedV)) finalGoodId = parsedV;
         }
         
-        if (rowObj["custom.spapart_or_product"] == null) rowObj["custom.spapart_or_product"] = "";
+        const rowObj = {
+          "custom.good_id": finalGoodId,
+          "SKU": v.sku || "",
+          "Title": p.title || "",
+          "Price": "",           // value ว่างไว้ก่อน
+          "include vat 7%": "",  // value ว่างไว้ก่อน
+          "vendor": p.vendor || "",
+          "Image URL": imageUrl,
+          "Handle": p.handle || ""
+        };
+        
         allRowsData.push(rowObj);
       });
     });
@@ -324,7 +333,7 @@ mutation BulkQuery($query: String!) {
       const now = new Date();
       const timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
       const method = usedSheetsApi ? "Sheets API" : "setValues";
-      logSheet.appendRow([timestamp, "✅ Success", rowCount, method]);
+      logSheet.appendRow([timestamp, "✅ Website Product Scanner Success", rowCount, method]);
     } catch (e) {}
   }
 
@@ -332,38 +341,37 @@ mutation BulkQuery($query: String!) {
     Logger.log("ALERT: " + message);
   }
 
-  // 3. MAIN EXECUTION FLOW (Inside function exportProductsToSheet)
+  // 3. MAIN EXECUTION FLOW
   const props = PropertiesService.getScriptProperties();
   props.deleteProperty(PROP_LAST_BULK_OP_ID);
   
-  Logger.log("🚀 [Single-Pass Export] เริ่มกระบวนการดึงข้อมูลสินค้าสดใหม่ทั้งหมดแบบรอบเดียวจบ...");
+  Logger.log("🚀 Starting export for Website Product Scanner...");
   
   const checkRes = callGraphQL({ query: `{ currentBulkOperation(type: QUERY) { id status url objectCount } }` });
   const currentOp = (checkRes && checkRes.data) ? checkRes.data.currentBulkOperation : null;
   
   let opId = null;
   if (currentOp && (currentOp.status === "RUNNING" || currentOp.status === "CREATED")) {
-    Logger.log("⏳ มี Bulk Operation กำลังประมวลผลอยู่แล้ว (" + currentOp.id + ") — กำลังรอผลลัพธ์...");
+    Logger.log("⏳ Active Bulk Operation detected (" + currentOp.id + ") — waiting...");
     opId = currentOp.id;
   } else {
-    Logger.log("🚀 เริ่มสั่ง Shopify สร้าง Bulk Query ใหม่ (Fresh Query)...");
+    Logger.log("🚀 Starting fresh bulk query for Product Scanner...");
     opId = startBulkQuery();
     if (!opId) {
       showAlert("❌ ไม่สามารถเริ่ม query ได้ โปรดตรวจสอบ Log");
       return;
     }
-    Logger.log("🚀 สร้าง Bulk Operation ใหม่สำเร็จ ID: " + opId);
   }
   
-  Logger.log("⏳ กำลังรอ Shopify ทำไฟล์ให้เสร็จ (เช็คสถานะทุกๆ 10 วินาที)...");
+  Logger.log("⏳ Waiting for Shopify bulk operation...");
   const result = pollStatusLoop(opId, 300000);
   
   if (result.status === "COMPLETED" && result.url) {
-    Logger.log("✅ Shopify ทำไฟล์เสร็จเรียบร้อยแล้ว! กำลังดาวน์โหลดและเขียนลง Google Sheet ทันที...");
+    Logger.log("✅ Bulk operation complete. Downloading and writing to sheet...");
     downloadAndProcessJSONL(result.url);
-    showAlert("✅ Export สินค้าทั้งหมดสำเร็จในรอบเดียวเรียบร้อยแล้ว!");
+    showAlert("✅ Export Product Scanner สำเร็จเรียบร้อย!");
   } else {
-    Logger.log("❌ Bulk operation ไม่สำเร็จ หรือ Timeout: " + JSON.stringify(result));
+    Logger.log("❌ Bulk operation failed or timed out: " + JSON.stringify(result));
     showAlert("❌ ดึงข้อมูลไม่สำเร็จ Status: " + result.status);
   }
 }
