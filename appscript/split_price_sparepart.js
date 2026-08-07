@@ -43,11 +43,30 @@ function onOpen() {
       "🧪 ทดสอบแยกราคา (10 แถวแรก)",
       "splitPriceSparepartTest10Rows"
     )
+    .addSeparator()
+    .addItem(
+      "🛑 ปลด Lock ฉุกเฉิน (Release Lock)",
+      "releaseSplitLock"
+    )
     .addToUi();
 }
 
 function splitPriceSparepartTest10Rows() {
   splitPriceSparepartSpreadsheetApp_(10);
+}
+
+// ปลด Lock ฉุกเฉิน — ใช้เมื่อ script ค้างและ lock ยังไม่ถูกปล่อยอัตโนมัติ
+// (lock จะหมดอายุเองใน ~6 นาที แต่ใช้ function นี้ปลดได้ทันที)
+function releaseSplitLock() {
+  try {
+    const lock = LockService.getScriptLock();
+    lock.releaseLock();
+    SpreadsheetApp.getActive().toast("✅ ปลด Lock สำเร็จ ลองรัน splitPriceSparepart ได้ใหม่แล้ว", "🛑 Release Lock", 5);
+    console.log("ปลด LockService.ScriptLock สำเร็จ");
+  } catch (e) {
+    SpreadsheetApp.getActive().toast("⚠️ ไม่มี Lock ที่ต้องปลด: " + e.message, "🛑 Release Lock", 5);
+    console.log("ไม่มี lock หรือปลดไม่สำเร็จ: " + e.message);
+  }
 }
 
 // ============================================================
@@ -224,13 +243,15 @@ function splitPriceSparepart(limitRows) {
     );
 
     // ========================================================
-    // 1. ตรวจสอบชีตในไฟล์ปัจจุบัน
+    // 1. ตรวจสอบชีตในไฟล์ปัจจุบัน + สร้างชีตปลายทาง
+    // (รวมเป็น 1 API call เพื่อความเร็ว)
     // ========================================================
 
     console.log(
-      "1/8 ตรวจสอบรายชื่อชีตในไฟล์ปัจจุบัน"
+      "1/8 ตรวจสอบรายชื่อชีตและสร้างชีตผลลัพธ์"
     );
 
+    // ── ดึง sheet map ครั้งเดียว แล้ว cache ไว้ใช้ตลอด ──
     let targetSheetMap =
       spsGetSpreadsheetSheetMap_(
         targetSpreadsheetId,
@@ -266,16 +287,23 @@ function splitPriceSparepart(limitRows) {
       "2/8 ตรวจสอบและสร้างชีตผลลัพธ์"
     );
 
-    targetSheetMap =
-      spsEnsureSheetsExist_(
+    const sheetsToEnsure = [
+      cfg.TARGET_NO_DISCOUNT_SHEET,
+      cfg.TARGET_WITH_DISCOUNT_SHEET,
+      cfg.LOG_SHEET_NAME
+    ];
+    const missingSheetsForCreate = sheetsToEnsure.filter(
+      function(name) { return !targetSheetMap[name]; }
+    );
+
+    if (missingSheetsForCreate.length > 0) {
+      // มีชีตที่ขาด → สร้าง + อัปเดต sheetMap
+      targetSheetMap = spsEnsureSheetsExist_(
         targetSpreadsheetId,
-        [
-          cfg.TARGET_NO_DISCOUNT_SHEET,
-          cfg.TARGET_WITH_DISCOUNT_SHEET,
-          cfg.LOG_SHEET_NAME
-        ],
+        sheetsToEnsure,
         cfg
       );
+    }
 
     // ========================================================
     // 3. อ่านข้อมูล Spare Parts1
@@ -926,6 +954,11 @@ function spsReadRangeChunked_(
 
 // ============================================================
 // GET LAST DATA ROW
+// ── ใช้ Sheets.Spreadsheets.get metadata (includeGridData=false)
+//    เร็วกว่ามากเพราะไม่โหลดข้อมูล cell เลย
+//    แต่ rowCount คือขนาด sheet ไม่ใช่ last data row
+//    จึงต้อง query ผ่าน Values API โดยอ่านเฉพาะ column เดียว
+//    ด้วย majorDimension=COLUMNS → API return array เดียว ไม่ต้องนับ row by row
 // ============================================================
 
 function spsGetLastDataRow_(
@@ -934,13 +967,6 @@ function spsGetLastDataRow_(
   columnLetter,
   cfg
 ) {
-  const range =
-    spsQuoteSheetName_(sheetName) +
-    "!" +
-    columnLetter +
-    ":" +
-    columnLetter;
-
   const response =
     spsRetrySheetsApi_(
       function () {
@@ -949,25 +975,21 @@ function spsGetLastDataRow_(
           .Values
           .get(
             spreadsheetId,
-            range,
+            spsQuoteSheetName_(sheetName) +
+              "!" + columnLetter + ":" + columnLetter,
             {
-              majorDimension:
-                "ROWS",
-
-              valueRenderOption:
-                "UNFORMATTED_VALUE"
+              majorDimension: "COLUMNS",
+              valueRenderOption: "UNFORMATTED_VALUE"
             }
           );
       },
-      "ตรวจสอบแถวสุดท้าย " +
-        sheetName,
+      "ตรวจสอบแถวสุดท้าย " + sheetName,
       cfg
     );
 
-  const values =
-    response.values || [];
-
-  return values.length;
+  // majorDimension=COLUMNS → values[0] = array ค่าในคอลัมน์ ความยาว = จำนวนแถวจริง
+  const col = (response.values || [])[0] || [];
+  return col.length;
 }
 
 
@@ -1406,11 +1428,8 @@ function spsWriteRunLog_(
   statusMessage,
   cfg
 ) {
-  spsEnsureSheetsExist_(
-    spreadsheetId,
-    [cfg.LOG_SHEET_NAME],
-    cfg
-  );
+  // ไม่เรียก spsEnsureSheetsExist_ ซ้ำ เพราะชีต Log ถูกสร้างใน step 2/8 แล้ว
+  // (เรียกซ้ำหมายถึง API call เพิ่ม 1-2 ครั้งทุกครั้งที่ log)
 
   const headerRange =
     spsQuoteSheetName_(

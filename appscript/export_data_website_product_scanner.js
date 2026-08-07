@@ -16,6 +16,10 @@ function exportDataWebsiteProductScanner() {
   const PROP_TOKEN_EXPIRY = "TOKEN_EXPIRY";
   const PROP_LAST_BULK_OP_ID = "LAST_BULK_OP_ID_SCANNER";
 
+  // Firestore project config (same Firebase project as frontend)
+  const FIRESTORE_PROJECT_ID = "sevenfive-product-scanner";
+  const FIRESTORE_COLLECTION = "products";
+
   // 2. INNER HELPERS
   function getAccessToken() {
     const props = PropertiesService.getScriptProperties();
@@ -374,4 +378,142 @@ mutation BulkQuery($query: String!) {
     Logger.log("❌ Bulk operation failed or timed out: " + JSON.stringify(result));
     showAlert("❌ ดึงข้อมูลไม่สำเร็จ Status: " + result.status);
   }
+}
+
+
+// ============================================================
+// FIRESTORE SYNC (Standalone Module)
+// ============================================================
+
+function onOpenProductScanner() {
+  SpreadsheetApp.getUi()
+    .createMenu("🔥 Firestore Sync")
+    .addItem("Sync 'Products' sheet to Firestore", "syncProductsSheetToFirestore")
+    .addToUi();
+}
+
+// Uses OAuth2 service account token from Apps Script runtime
+function getFirestoreTokenScanner() {
+  return ScriptApp.getOAuthToken();
+}
+
+function syncProductsSheetToFirestore() {
+  const FIRESTORE_PROJECT_ID = "sevenfive-product-scanner";
+  const FIRESTORE_COLLECTION = "products";
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const productSheet = ss.getSheetByName("Products") || ss.getSheets()[0];
+  if (!productSheet) {
+    Logger.log("❌ ไม่พบชีต Products");
+    SpreadsheetApp.getUi().alert("ไม่พบชีต Products");
+    return;
+  }
+  
+  const data = productSheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    Logger.log("❌ ไม่มีข้อมูลในชีต Products");
+    return;
+  }
+  
+  const headers = data[0];
+  let skuIndex = -1, handleIndex = -1;
+  
+  for (let i = 0; i < headers.length; i++) {
+    const h = String(headers[i]).trim().toLowerCase();
+    if (h === "sku" || h === "รหัสสินค้า") skuIndex = i;
+    else if (h === "handle" || h === "slug") handleIndex = i;
+  }
+  if (skuIndex === -1) skuIndex = 0; // Default to first col
+  
+  const allRowsData = [];
+  for (let r = 1; r < data.length; r++) {
+    const row = data[r];
+    const rowSku = String(row[skuIndex] || "").trim();
+    if (!rowSku) continue;
+    
+    let foundItem = { SKU: rowSku };
+    for (let c = 0; c < headers.length; c++) {
+      const key = String(headers[c]).trim();
+      const lowerKey = key.toLowerCase();
+      const val = String(row[c] || "");
+      
+      foundItem[key] = val;
+      if (lowerKey === "title" || lowerKey === "name" || lowerKey === "ชื่อสินค้า") foundItem["Title"] = val;
+      if (lowerKey === "brand" || lowerKey === "แบรนด์" || lowerKey === "vendor") foundItem["vendor"] = val;
+      if (lowerKey === "price" || lowerKey === "ราคา") foundItem["Price"] = val;
+      if (lowerKey === "image" || lowerKey === "imageurl" || lowerKey === "รูปภาพ" || lowerKey === "image url") foundItem["Image URL"] = val;
+      if (lowerKey.indexOf("vat") !== -1) foundItem["include vat 7%"] = val;
+      if (lowerKey === "handle" || lowerKey === "slug") foundItem["Handle"] = val;
+    }
+    allRowsData.push(foundItem);
+  }
+  
+  Logger.log(`🔥 Starting Firestore sync for ${allRowsData.length} items from Products sheet...`);
+  
+  const token = getFirestoreTokenScanner();
+  const baseUrl = `https://firestore.googleapis.com/v1/projects/${FIRESTORE_PROJECT_ID}/databases/(default)/documents`;
+  const BATCH_SIZE = 500;
+  let totalSynced = 0;
+  let totalErrors = 0;
+
+  for (let i = 0; i < allRowsData.length; i += BATCH_SIZE) {
+    const chunk = allRowsData.slice(i, i + BATCH_SIZE);
+    
+    const writes = chunk.map(row => {
+      const sku = row["SKU"];
+      const encodedSku = encodeURIComponent(sku);
+      const docPath = `projects/${FIRESTORE_PROJECT_ID}/databases/(default)/documents/${FIRESTORE_COLLECTION}/${encodedSku}`;
+      
+      const fields = {
+        sku:      { stringValue: sku },
+        title:    { stringValue: String(row["Title"] || "") },
+        price:    { stringValue: String(row["Price"] || "") },
+        includeVat: { stringValue: String(row["include vat 7%"] || "") },
+        vendor:   { stringValue: String(row["vendor"] || "") },
+        imageUrl: { stringValue: String(row["Image URL"] || "") },
+        handle:   { stringValue: String(row["Handle"] || "") },
+        goodId:   { stringValue: String(row["custom.good_id"] || "") },
+        updatedAt: { timestampValue: new Date().toISOString() }
+      };
+      
+      return { update: { name: docPath, fields: fields } };
+    });
+
+    try {
+      const payload = JSON.stringify({ writes: writes });
+      const res = UrlFetchApp.fetch(`${baseUrl}:batchWrite`, {
+        method: "post",
+        contentType: "application/json",
+        headers: { "Authorization": "Bearer " + token },
+        payload: payload,
+        muteHttpExceptions: true
+      });
+
+      if (res.getResponseCode() >= 400) {
+        Logger.log(`[Firestore] batchWrite chunk ${i}-${i + chunk.length} FAILED: HTTP ${res.getResponseCode()}: ${res.getContentText().substring(0, 200)}`);
+        totalErrors += writes.length;
+      } else {
+        totalSynced += writes.length;
+        Logger.log(`[Firestore] Synced chunk ${i+1}-${i + writes.length} (${writes.length} docs)`);
+      }
+    } catch (err) {
+      Logger.log("[Firestore] batchWrite error: " + err.message);
+      totalErrors += writes.length;
+    }
+    
+    if (i + BATCH_SIZE < allRowsData.length) {
+      Utilities.sleep(200);
+    }
+  }
+
+  Logger.log(`✅ Firestore sync done: ${totalSynced} synced, ${totalErrors} errors`);
+  
+  try {
+    let logSheet = ss.getSheetByName("Logrun script");
+    if (logSheet) {
+      const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+      logSheet.appendRow([timestamp, `🔥 Firestore sync (Products sheet): ${totalSynced} synced, ${totalErrors} errors`, totalSynced, "Firestore REST API"]);
+    }
+    SpreadsheetApp.getUi().alert(`✅ Firestore Sync เสร็จสมบูรณ์!\nซิงค์สำเร็จ: ${totalSynced} รายการ\nผิดพลาด: ${totalErrors} รายการ`);
+  } catch (e) {}
 }

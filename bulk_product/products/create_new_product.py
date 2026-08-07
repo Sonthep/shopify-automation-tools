@@ -341,12 +341,15 @@ def get_publication_map():
 
     publication_edges = body.get("data", {}).get("publications", {}).get("edges", [])
     pub_map = {
-        edge["node"]["name"].strip().lower(): edge["node"]["id"]
+        edge["node"]["name"].strip().lower(): {
+            "id": edge["node"]["id"],
+            "name": edge["node"]["name"].strip()
+        }
         for edge in publication_edges
         if edge.get("node", {}).get("id") and edge.get("node", {}).get("name")
     }
     _publication_map_cache = pub_map
-    names = [edge["node"].get("name") for edge in publication_edges if edge.get("node", {}).get("name")]
+    names = [info["name"] for info in pub_map.values()]
     print(f"  📡 Publications found: {len(pub_map)} | {names}")
     return pub_map
 
@@ -357,17 +360,19 @@ def publish_product(product_id, target_channels=None):
         print("  ⚠️ No publications found to publish to")
         return
 
-    # Default to the 3 channels: Online Store, Point of Sale, Inbox (excludes NTS Storefront)
-    if target_channels is None:
-        target_channels = ["Online Store", "Point of Sale", "Inbox"]
-
     target_ids = []
     selected_names = []
-    for ch in target_channels:
-        ch_lower = ch.strip().lower()
-        if ch_lower in pub_map:
-            target_ids.append(pub_map[ch_lower])
-            selected_names.append(ch.strip())
+    # If target_channels is specified, use them; otherwise default to ALL available publications
+    if target_channels:
+        for ch in target_channels:
+            ch_lower = ch.strip().lower()
+            if ch_lower in pub_map:
+                target_ids.append(pub_map[ch_lower]["id"])
+                selected_names.append(pub_map[ch_lower]["name"])
+    else:
+        for info in pub_map.values():
+            target_ids.append(info["id"])
+            selected_names.append(info["name"])
 
     if not target_ids:
         print(f"  ⚠️ No matching publication IDs for channels: {target_channels}")
@@ -659,9 +664,9 @@ if __name__ == "__main__":
         # Step 2b: Register Thai translations if provided
         register_thai_translations(product_id, row)
 
-        # Step 3: Publish to target channels (Online Store, Point of Sale, Inbox)
+        # Step 3: Publish to target channels (default to all sales channels if not specified)
         channels_val = get_val(row, "Sales Channels") or get_val(row, "Published Channels")
-        target_channels = [c.strip() for c in channels_val.split(",") if c.strip()] if channels_val else ["Online Store", "Point of Sale", "Inbox"]
+        target_channels = [c.strip() for c in channels_val.split(",") if c.strip()] if channels_val else None
         publish_product(product_id, target_channels=target_channels)
 
         # Step 4: Add images
