@@ -1,0 +1,28 @@
+# Root requirements.txt — covers every Python module in this repo
+# (bulk_product/, pdf_sourcing/, menu/, bulk_blog/, download/, scraper/, scripts/)
+#
+# Install once from the project root:
+#   pip install -r requirements.txt
+
+# Core / Shopify API + CSV/Excel handling
+requests
+pandas
+python-dotenv
+openpyxl
+
+# pdf_sourcing/, bulk_product/pdf/
+pypdf
+
+# bulk_blog/, scraper/ (HTML parsing)
+beautifulsoup4
+
+# download/, bulk_product/images/ (image processing)
+Pillow
+rembg
+
+# scraper/ (browser automation, YouTube)
+undetected-chromedriver
+yt-dlp
+
+# scripts/export_products_to_sheet.py (Google Sheets export)
+gspread

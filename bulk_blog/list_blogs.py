@@ -1,5 +1,10 @@
 import sys, os, importlib.util
-spec = importlib.util.spec_from_file_location('utils', r'C:\Users\0125024\Documents\shoptify\bulk-update-product\utils.py')
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BASE_DIR)
+UTILS_PATH = os.path.join(ROOT_DIR, "bulk_product", "utils.py")
+
+spec = importlib.util.spec_from_file_location('utils', UTILS_PATH)
 utils = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(utils)
 headers = utils.make_headers('SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT')

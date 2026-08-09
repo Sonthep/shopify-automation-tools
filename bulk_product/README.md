@@ -7,10 +7,14 @@
 ## Requirements
 
 ```bash
-pip install -r requirements.txt
+pip install -r ../requirements.txt
 ```
 
-Dependencies: `requests`, `pandas`, `python-dotenv`
+Dependencies: `requests`, `pandas`, `python-dotenv` (see root [`requirements.txt`](../requirements.txt)
+for the full repo-wide list)
+
+> ทุกสคริปต์ในโฟลเดอร์นี้รองรับ `DRY_RUN=true` (ผ่าน `shopify_client.py`) — ดูรายละเอียดที่
+> root [`README.md`](../README.md#-dry-run-mode--mutation-audit-log)
 
 ---
 

@@ -3,9 +3,12 @@ Centralized Shopify API Client & Helper Utilities.
 Supports GraphQL, REST requests, automatic token refresh, throttle handling, and dynamic path resolution.
 """
 
+import json
 import os
+import re
 import sys
 import time
+from datetime import datetime, timezone
 import requests
 from pathlib import Path
 from dotenv import load_dotenv
@@ -33,6 +36,44 @@ def resolve_path(path_str: str | Path) -> Path:
 # Load .env file from project root
 ENV_FILE = get_project_root() / ".env"
 load_dotenv(dotenv_path=ENV_FILE, override=True)
+
+# ── Dry-run & mutation audit log ────────────────────────────────────────────
+# Set DRY_RUN=true (env var or .env) to log every mutation that WOULD be sent
+# without actually calling the Shopify API. Every mutation (dry-run or real)
+# is always appended to logs/mutations.log for auditing regardless of this flag.
+DRY_RUN = os.getenv("DRY_RUN", "").strip().lower() in ("1", "true", "yes")
+LOG_DIR = get_project_root() / "logs"
+MUTATION_LOG_FILE = LOG_DIR / "mutations.log"
+_MUTATION_RE = re.compile(r"^\s*mutation\b", re.IGNORECASE)
+_LOG_FIELD_MAX_CHARS = 5000
+
+
+def _is_mutation(query: str) -> bool:
+    return bool(_MUTATION_RE.match(query or ""))
+
+
+def _truncate(value: str) -> str:
+    if len(value) <= _LOG_FIELD_MAX_CHARS:
+        return value
+    return value[:_LOG_FIELD_MAX_CHARS] + f"...<truncated {len(value) - _LOG_FIELD_MAX_CHARS} chars>"
+
+
+def _log_mutation(token_env: str, query: str, variables: dict | None, dry_run: bool) -> None:
+    """Append an audit-trail entry for an outgoing mutation. Never raises."""
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "script": Path(sys.argv[0]).name if sys.argv and sys.argv[0] else "unknown",
+            "token_env": token_env,
+            "dry_run": dry_run,
+            "query": _truncate(query.strip()),
+            "variables": _truncate(json.dumps(variables or {}, ensure_ascii=False, default=str)),
+        }
+        with open(MUTATION_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception as e:
+        print(f"  [WARN] Failed to write mutation audit log: {e}")
 
 
 class ShopifyClient:
@@ -71,7 +112,21 @@ class ShopifyClient:
         return None
 
     def gql(self, query: str, variables: dict | None = None, max_retries: int = 6) -> dict | None:
-        """Execute a GraphQL query/mutation with throttle handling and 401 retry."""
+        """Execute a GraphQL query/mutation with throttle handling and 401 retry.
+
+        Every mutation is appended to logs/mutations.log for auditing. If DRY_RUN
+        is enabled, mutations are logged but NOT sent to Shopify -- this returns
+        None instead, same as any other failed call, so callers using the common
+        `(body or {}).get("data", {})` pattern degrade gracefully. Non-mutation
+        queries always execute normally, dry-run or not.
+        """
+        if _is_mutation(query):
+            _log_mutation(self.token_env, query, variables, DRY_RUN)
+            if DRY_RUN:
+                preview = " ".join(query.split())[:200]
+                print(f"  [DRY-RUN] Skipped mutation ({self.token_env}): {preview}...")
+                return None
+
         wait = 2.0
         headers = self.headers.copy()
 

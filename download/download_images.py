@@ -1,10 +1,21 @@
+import argparse
 import csv
 import os
 import urllib.request
 from urllib.error import URLError, HTTPError
 
-csv_file = r'c:\Users\0125024\Documents\shoptify\bulk-update-product\data\cambro_image.csv'
-output_dir = r'c:\Users\0125024\Documents\shoptify\download\images'
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(SCRIPT_DIR)
+
+parser = argparse.ArgumentParser(description="Download product images listed in a CSV (columns: sku, url).")
+parser.add_argument("--csv", default=os.path.join(ROOT_DIR, "bulk_product", "data", "cambro_image.csv"),
+                     help="Path to CSV file with sku,url columns")
+parser.add_argument("--out", default=os.path.join(SCRIPT_DIR, "images"),
+                     help="Directory to save downloaded images into")
+args = parser.parse_args()
+
+csv_file = args.csv
+output_dir = args.out
 
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)

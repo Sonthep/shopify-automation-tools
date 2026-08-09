@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python-syntax:
+    name: Python syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile all Python files
+        run: python -m compileall -q .
+
+  node-syntax:
+    name: Node/Apps Script syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Check .js/.mjs syntax (parse only, does not execute)
+        run: |
+          set -e
+          find . -path ./node_modules -prune -o \( -name "*.js" -o -name "*.mjs" \) -print \
+            | while read -r f; do
+                echo "Checking $f"
+                node --check "$f"
+              done
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if .env is tracked
+        run: |
+          if git ls-files | grep -qx '\.env'; then
+            echo "::error::.env is tracked in git — remove it and rotate all tokens."
+            exit 1
+          fi
+      - name: Scan for real Shopify access tokens
+        run: |
+          set -e
+          # Real tokens are shpat_/shpca_/shpss_ + 32 hex chars.
+          # Placeholders like shpat_xxxxxxxxxx use literal 'x' and won't match.
+          if git grep -InE '\b(shpat|shpca|shpss)_[a-f0-9]{32}\b' -- . ':!.github/workflows/ci.yml'; then
+            echo "::error::Possible live Shopify access token found in tracked files."
+            exit 1
+          fi
+          echo "No live-looking Shopify tokens found."

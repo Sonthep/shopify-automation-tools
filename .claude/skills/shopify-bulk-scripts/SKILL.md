@@ -68,12 +68,28 @@ Don't query the API per-SKU in a loop. Use `bulk_product/utils.py`:
 - Bulk Mutation JSONL payloads go in that domain's `output/` folder (e.g.
   `bulk_product/products/output/bulk.jsonl`), matching the naming already there.
 
+## Dry-run + mutation audit log
+
+`shopify_client.py`'s `ShopifyClient.gql()` intercepts every GraphQL call that starts with
+`mutation` (regex on the query string) — this is automatic, no per-script code needed:
+
+- Every mutation is appended to `logs/mutations.log` (timestamp, script, token_env, query,
+  variables) regardless of dry-run — this is the project's audit trail, not a before/after
+  data snapshot. It won't tell you what a value *was*, only what was sent and when.
+- Set `DRY_RUN=true` (env or `.env`) to skip actually sending mutations — read-only queries
+  (SKU→GID resolution, etc.) still run normally. The call returns `None`, so code using the
+  common `(body or {}).get("data", {})` pattern degrades gracefully instead of crashing —
+  but a script's own printed success/fail counts won't be meaningful in dry-run since no real
+  response comes back. Treat dry-run as "confirm nothing hits Shopify", not a full simulation.
+- This only covers Python paths that go through `ShopifyClient`/`bulk_product/utils.py`. It
+  does not cover `scripts/*.mjs` (Node) or `appscript/*.js` (Google Apps Script, deployed
+  separately — no shared client to hook into).
+
 ## Before committing generated files
 
-`.env`, `bulk_product/cache/`, and most `output/`/`data/` files are gitignored —
-don't fight that. A handful of `output/*.jsonl` and `products/output/*.xlsx` files
-are already tracked from before the ignore rules existed; don't add *new* generated
-files to git even if `git status` shows an existing one as tracked.
+`.env`, `bulk_product/cache/`, `logs/`, and most `output/`/`data/` files are gitignored —
+don't fight that, and don't add new generated files to git even if an old one from before
+the ignore rules were fixed still shows up in `git status` as tracked somewhere unexpected.
 
 ## Repo layout notes
 
