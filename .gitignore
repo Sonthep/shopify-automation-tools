@@ -7,57 +7,40 @@ __pycache__/
 *.pyo
 
 # ============================================================
-# bulk-update-product: generated / large data files
+# bulk_product: generated / large data files
 # ============================================================
-bulk-update-product/data/*.csv
-bulk-update-product/data/*.xlsx
-bulk-update-product/data/*.jsonl
-bulk-update-product/data/*.json
+bulk_product/data/*.csv
+bulk_product/data/*.xlsx
+bulk_product/data/*.jsonl
+bulk_product/data/*.json
+bulk_product/data/outputs/
 
 # Keep sample / template files
-!bulk-update-product/data/*_sample*.csv
-!bulk-update-product/data/metafield_definitions.csv
-!bulk-update-product/data/metafield_definitions_*.csv
+!bulk_product/data/*_sample*.csv
+!bulk_product/data/metafield_definitions.csv
+!bulk_product/data/metafield_definitions_*.csv
 
-bulk-update-product/output/
-bulk-update-product/cache/
-bulk-update-product/*.jsonl
-bulk-update-product/*.json
-bulk-update-product/not_found*.csv
-bulk-update-product/failed.csv
-bulk-update-product/__pycache__/
-bulk-update-product/pdf ต่างประเทศ/
+bulk_product/output/
+bulk_product/*/output/
+bulk_product/cache/*.json
+bulk_product/not_found*.csv
+bulk_product/failed.csv
 
 # images: temp image folders
-bulk-update-product/images/update_image/
-bulk-update-product/images/data/
-
-# pdf-international: local PDF assets
-bulk-update-product/pdf-international/
-
-# clean_image: separate venv (redundant with root)
-clean_image/.venv/
-
-# ============================================================
-# create-collection
-# ============================================================
-create-collection/image\ logo.csv
-vendor-images/
-create-collection/brand/
-create-collection/category/
-
-# ============================================================
-# menu-importer: generated / backup files
-# ============================================================
-menu-importer/menu-backup-*.csv
-menu-importer/menu-backup-*.json
-menu-importer/import-menu.csv
-menu-importer/update-cat-sp.csv
+bulk_product/images/update_image/
+bulk_product/images/data/
 
 # ============================================================
 # scripts: output files
 # ============================================================
 scripts/output/
+
+# ============================================================
+# pdf_sourcing: generated PDF staging folders
+# ============================================================
+Found_PDFs/
+Found_PDFs_Backup.zip
+Web_Ready_PDFs/
 
 # ============================================================
 # OS / Editor
@@ -66,41 +49,22 @@ scripts/output/
 Thumbs.db
 *.rar
 
-# Ignored data and images
-*.xlsx
+# ============================================================
+# Ignored data and media (generated/large, regenerable)
+# ============================================================
 *.csv
+*.xlsx
+*.xls
+*.jsonl
+*.inspect.ndjson
+*.pdf
+*.zip
+*.doc
+*.pptx
+success_skus.txt
+not upload complete/
+.artifact_work/
+
 download/image_form_abroad/
 download/images_batch27/
 download/canva_test_folder/
-
-# menu-importer new structure
-menu-importer/data/
-menu-importer/backups/
-menu-importer/output/
-
-# bulk_product data
-bulk_product/products/output/
-*.jsonl
-*.inspect.ndjson
-
-# PDF backups and large data
-Found_PDFs/
-Found_PDFs_Backup.zip
-Web_Ready_PDFs/
-.artifact_work/
-bulk_product/collections/scratch_check_col.py
-bulk_product/data/outputs/
-not upload complete/
-success_skus.txt
-
-# Ignore large media and data files
-*.pdf
-*.zip
-*.xlsx
-*.xls
-*.doc
-*.pptx
-*.jsonl
-bulk-update-product/
-menus-output.json
-

@@ -1,4 +1,4 @@
-# bulk-update-product
+# bulk_product
 
 ชุด Python scripts สำหรับจัดการ Shopify products ผ่าน Admin GraphQL API (Bulk Mutation)
 

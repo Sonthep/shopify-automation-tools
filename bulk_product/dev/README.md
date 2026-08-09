@@ -13,3 +13,6 @@
 | `debug_inv.py` | ตรวจสอบ inventory |
 | `debug_schema.py` | ดู GraphQL schema |
 | `test_query.py` | ทดสอบ GraphQL queries |
+| `scratch_menu.py` | ทดสอบ mutation สร้างเมนู |
+| `scratch_query.py` | ทดสอบ query product ทั่วไป |
+| `scratch_query2.py` | ทดสอบ query product (เพิ่ม field description) |

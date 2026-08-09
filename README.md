@@ -1,82 +1,72 @@
 # shopify-automation-tools
 
-ชุด scripts สำหรับจัดการ Shopify store ผ่าน Admin API — อัปเดต product, สร้าง collection และจัดการ menu
+ชุด scripts สำหรับจัดการ Shopify store ผ่าน Admin API — อัปเดต product, จัดการรูป/PDF,
+sync กับ Google Sheets, และจัดการเมนู/บล็อก/collection
 
 ---
 
 ## 📁 Project Structure
 
 ```
-shoptify/
-├── .env                          # API tokens (ไม่ commit)
-├── .env.example                  # Template สำหรับ setup ใหม่
+shopify-automation-tools/
+├── .env                      # API tokens (ไม่ commit)
+├── .env.example              # Template สำหรับ setup ใหม่
+├── shopify_client.py         # Shared Shopify API client (gql, throttle retry, token refresh)
+├── gen_token.py              # ขอ Admin API token ใหม่ (Client Credentials)
 ├── package.json
 │
-├── bulk-update-product/          # Python module
-│   ├── utils.py                  # Shared utilities (gql, headers, CSV)
-│   ├── requirements.txt
-│   ├── data/                     # Input CSV files (ไม่ commit)
-│   ├── output/                   # Output/result files (ไม่ commit)
-│   ├── cache/                    # SKU→GID cache (ไม่ commit)
-│   └── dev/                      # Debug & test scripts (ไม่ใช้ใน production)
+├── bulk_product/             # Python — Shopify Admin GraphQL Bulk Mutation API (โมดูลหลัก)
+│   ├── products/ collections/ metafields/ images/ pdf/ price/ reports/
+│   ├── utils.py               # Shared helpers (gql, SKU→GID cache, CSV I/O)
+│   ├── data/ output/ cache/    # Input/output/cache ต่อ run (ไม่ commit)
+│   └── dev/                    # Debug & one-off scripts (ไม่ใช้ใน production)
 │
-├── create-collection/            # JavaScript module
-│   └── create-collections.js
+├── pdf_sourcing/              # Python — ค้นหา/จัดหมวด/จับคู่ PDF เข้ากับ SKU ก่อนอัปโหลด
+│                               # (ดูลำดับขั้นตอนใน pdf_sourcing/README.md)
 │
-├── menu-importer/                # JavaScript module (Shopify CLI)
-│   ├── import-menu.js
-│   ├── fetch-menu.js
-│   └── backup-menu.js
+├── appscript/                 # Google Apps Script — sync ข้อมูล product/inventory/price กับ Sheets
 │
-└── scripts/                      # Root-level utility scripts
-    ├── get-menus.mjs
-    ├── menus-to-csv.mjs
-    └── update_inventory_auto.js
+├── menu/                      # Python — CRUD เมนู storefront ผ่าน Admin API
+├── bulk_blog/                 # Python — สร้าง/แก้ไขบทความบล็อกแบบ bulk
+├── download/                  # Python — ดาวน์โหลด/rename รูปภาพเป็นชุด (batch)
+├── scraper/                   # Python — scrape ข้อมูลจากเว็บ/YouTube ภายนอก
+├── scripts/                   # Node/Python — get menu, export product ไป Sheet, update price/inventory
+└── scratch/                   # สคริปต์ทดลอง/debug ข้ามโมดูล (ไม่ใช้ใน production)
 ```
 
 ---
 
 ## 📦 Modules
 
-### [`bulk-update-product/`](./bulk-update-product/)
-Python scripts สำหรับอัปเดต/สร้าง/ลบ Shopify products ผ่าน Bulk Mutation GraphQL API
-
-- อัปเดต title, description, vendor, product type, tags, price, metafields
-- สร้าง product ใหม่จาก CSV
-- ลบ product ตาม SKU
-- อัปเดต image และ PDF file
+### [`bulk_product/`](./bulk_product/)
+โมดูลหลัก — จัดการ Shopify products, collections, metafields, images, PDF, price ผ่าน
+Bulk Mutation GraphQL API ดูรายละเอียดสคริปต์ทั้งหมดใน [`bulk_product/README.md`](./bulk_product/README.md)
 
 **Stack:** Python, `requests`, `pandas`, `python-dotenv`
 
----
+### [`pdf_sourcing/`](./pdf_sourcing/)
+ค้นหาไฟล์ PDF (spec sheet, manual, spare parts ฯลฯ) จากไดรฟ์เครือข่าย จัดหมวดหมู่ และจับคู่เข้ากับ SKU
+ก่อนส่งต่อให้ `bulk_product/pdf/` อัปโหลดขึ้น Shopify — ทำงานกับไฟล์ในเครื่องล้วน ๆ ไม่เรียก Shopify API
+ดูลำดับขั้นตอนแบบละเอียดใน [`pdf_sourcing/README.md`](./pdf_sourcing/README.md)
 
-### [`create-collection/`](./create-collection/)
-JavaScript script สำหรับสร้าง Shopify Smart Collections จาก CSV รายชื่อ vendor พร้อม logo image
+### [`appscript/`](./appscript/)
+Google Apps Script (deploy แยกใน Google Sheets/Apps Script editor เอง ไม่ได้รันจาก repo นี้)
+สำหรับ export/sync product, inventory และ price ระหว่าง Shopify กับ Google Sheets
 
-- สร้าง Smart Collection พร้อม rule `VENDOR = <Brand Name>`
-- รองรับ image URL หรือ local image
+### [`menu/`](./menu/), [`bulk_blog/`](./bulk_blog/)
+Python scripts จัดการเมนู storefront และบทความบล็อกผ่าน Admin API แบบ bulk
 
-**Stack:** Node.js, `node-fetch`, `csv-parser`
-
----
-
-### [`menu-importer/`](./menu-importer/)
-JavaScript script สำหรับ import/export/backup เมนู Shopify storefront navigation
-
-**Stack:** Node.js, Shopify CLI
-
----
+### [`download/`](./download/), [`scraper/`](./scraper/)
+Utility scripts สำหรับดาวน์โหลด/จัดชุดรูปภาพ และ scrape ข้อมูลจากเว็บภายนอก (ใช้ประกอบการเตรียมข้อมูลสินค้า)
 
 ### [`scripts/`](./scripts/)
-Utility scripts ระดับ root สำหรับดึงเมนู, แปลง CSV, และอัปเดต inventory
+Utility scripts ระดับ root — ดึงเมนู, แปลงเมนูเป็น CSV, export product ไป Google Sheet, อัปเดต price/inventory
 
 ---
 
 ## ⚙️ Setup
 
 ### 1. Environment Variables
-
-คัดลอก `.env.example` แล้วกรอก token:
 
 ```bash
 cp .env.example .env
@@ -95,13 +85,13 @@ PUBLIC_STOREFRONT_API_TOKEN=xxxxxxxxxx
 
 > ⚠️ **อย่า commit ไฟล์ `.env`** — มี token จริงอยู่
 
-### 2. Python (bulk-update-product)
+### 2. Python
 
 ```bash
-pip install -r bulk-update-product/requirements.txt
+pip install -r bulk_product/requirements.txt
 ```
 
-### 3. Node.js (create-collection, menu-importer, scripts)
+### 3. Node.js (scripts/)
 
 ```bash
 npm install
@@ -112,26 +102,22 @@ npm install
 ## 🚀 Common Commands
 
 ```bash
-# ดึงเมนูจาก Shopify
+# ดึงเมนูจาก Shopify → JSON
 npm run get-menus
 
 # แปลงเมนู JSON → CSV
 npm run menus-to-csv
 
-# Import เมนูเข้า Shopify
-npm run import-menu
+# อัปเดต inventory / price (Node)
+npm run update-inventory
+npm run update-price
 
-# Backup เมนูปัจจุบัน
-npm run backup-menu
+# ขอ Admin API token ใหม่
+npm run gen-token
 
-# สร้าง collections จาก CSV
-npm run create-collections
-
-# Python: อัปเดต product
-python bulk-update-product/update_product.py
-
-# Python: อัปเดต metafields
-python bulk-update-product/update_metafields_value.py
+# Python: อัปเดต product / metafields (รันจากใน bulk_product/)
+python bulk_product/products/update_product.py
+python bulk_product/metafields/update_metafields_value.py
 ```
 
 ---
@@ -139,5 +125,5 @@ python bulk-update-product/update_metafields_value.py
 ## 🔐 Security
 
 - ไฟล์ `.env` อยู่ใน `.gitignore` แล้ว
-- ถ้าเคย commit `.env` ไปแล้ว ให้ **rotate token ทั้งหมด** ใน Shopify Admin → Apps → API credentials
-- ดู [`SECURITY.md`](./menu-importer/SECURITY.md) สำหรับข้อมูลเพิ่มเติม
+- ถ้าเคย commit `.env` ไปแล้ว ให้ **rotate token ทั้งหมด** ใน Shopify Admin → Settings → Apps →
+  Develop apps
