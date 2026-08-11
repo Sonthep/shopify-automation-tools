@@ -19,7 +19,7 @@ function exportProductForCheckDataTest(perCategoryLimit) {
   // 1. CONFIG & CONSTANTS
   const SHOP = PropertiesService.getScriptProperties().getProperty("SHOP") || "sevenfive-4062.myshopify.com";
   const CLIENT_ID = PropertiesService.getScriptProperties().getProperty("CLIENT_ID") || "696e1e9162c702cc07c2f94a1beacf8a";
-  const CLIENT_SECRET = PropertiesService.getScriptProperties().getProperty("CLIENT_SECRET");
+  const CLIENT_SECRET = PropertiesService.getScriptProperties().getProperty("CLIENT_SECRET") || "";
 
   const SHEET_PRODUCT = "product";
   const SHEET_SPAREPART = "sparepart";
@@ -97,6 +97,7 @@ function exportProductForCheckDataTest(perCategoryLimit) {
         edges {
           node {
             id
+            title
             status
             vendor
             descriptionHtml
@@ -163,12 +164,14 @@ function exportProductForCheckDataTest(perCategoryLimit) {
     const datasheet = productNode.datasheet ? productNode.datasheet.value : "";
     const linkPdf = productNode.linkPdf ? productNode.linkPdf.value : "";
     const bodyHtml = productNode.descriptionHtml || "";
+    const title = productNode.title || "";
     const status = productNode.status || "";
     const vendor = productNode.vendor || "";
 
     return (variants.length ? variants : [{}]).map(v => ({
       "custom.good_id": goodId,
       "Variant SKU": v.sku || "",
+      "Title": title,
       "Body (HTML)": bodyHtml,
       "Status": status,
       "custom.spapart_or_product": spVal,
@@ -185,6 +188,7 @@ function exportProductForCheckDataTest(perCategoryLimit) {
   const FULL_HEADERS = [
     "custom.good_id",
     "Variant SKU",
+    "Title",
     "Body (HTML)",
     "Status",
     "custom.spapart_or_product",
@@ -202,7 +206,9 @@ function exportProductForCheckDataTest(perCategoryLimit) {
   const SPAREPART_HEADERS = [
     "custom.good_id",
     "Variant SKU",
+    "Title",
     "Status",
+    "Stock NI",
     "custom.spapart_or_product",
     "Vendor",
     "Image Src",
@@ -263,6 +269,18 @@ function exportProductForCheckDataTest(perCategoryLimit) {
         return [`=IF(${cell}="",0,LEN(${cell})-LEN(SUBSTITUTE(${cell},",",""))+1)`];
       });
       sheet.getRange(2, countCol, rows.length, 1).setFormulas(formulas);
+    }
+
+    // "Stock NI" (เฉพาะชีต sparepart) = XLOOKUP หา good_id ในชีตภายนอก "Main Product" (คอลัมน์ A) คืนค่าคอลัมน์ P
+    const goodIdCol = finalHeaders.indexOf("custom.good_id") + 1;
+    const stockNiCol = finalHeaders.indexOf("Stock NI") + 1;
+    if (goodIdCol > 0 && stockNiCol > 0 && rows.length > 0) {
+      const goodIdLetter = columnToLetter(goodIdCol);
+      const formulas = rows.map((_, i) => {
+        const cell = `${goodIdLetter}${i + 2}`;
+        return [`=XLOOKUP(${cell}, IMPORTRANGE("1Z48qT3LXYozhlh_ZBHzn9e4x1kfX_bOLHQtaksj-ZXU","Main Product!A:A"), IMPORTRANGE("1Z48qT3LXYozhlh_ZBHzn9e4x1kfX_bOLHQtaksj-ZXU","Main Product!P:P"))`];
+      });
+      sheet.getRange(2, stockNiCol, rows.length, 1).setFormulas(formulas);
     }
 
     Logger.log("  ✅ เขียนชีท '" + sheetName + "' แล้ว " + rows.length + " แถว");
@@ -406,6 +424,7 @@ function exportProductForCheckData() {
     edges {
       node {
         id
+        title
         status
         vendor
         descriptionHtml
@@ -590,6 +609,7 @@ mutation BulkQuery($query: String!) {
     const datasheet = mf["custom.datasheet"] || "";
     const linkPdf = mf["custom.link_pdf"] || "";
     const bodyHtml = p.descriptionHtml || "";
+    const title = p.title || "";
     const status = p.status || "";
     const vendor = p.vendor || "";
 
@@ -598,6 +618,7 @@ mutation BulkQuery($query: String!) {
       rows: pVariants.map(v => ({
         "custom.good_id": goodId,
         "Variant SKU": v.sku || "",
+        "Title": title,
         "Body (HTML)": bodyHtml,
         "Status": status,
         "custom.spapart_or_product": spVal,
@@ -615,6 +636,7 @@ mutation BulkQuery($query: String!) {
   const FULL_HEADERS = [
     "custom.good_id",
     "Variant SKU",
+    "Title",
     "Body (HTML)",
     "Status",
     "custom.spapart_or_product",
@@ -632,7 +654,9 @@ mutation BulkQuery($query: String!) {
   const SPAREPART_HEADERS = [
     "custom.good_id",
     "Variant SKU",
+    "Title",
     "Status",
+    "Stock NI",
     "custom.spapart_or_product",
     "Vendor",
     "Image Src",
@@ -744,6 +768,18 @@ mutation BulkQuery($query: String!) {
         return [`=IF(${cell}="",0,LEN(${cell})-LEN(SUBSTITUTE(${cell},",",""))+1)`];
       });
       sheet.getRange(2, countCol, rows.length, 1).setFormulas(formulas);
+    }
+
+    // "Stock NI" (เฉพาะชีต sparepart) = XLOOKUP หา good_id ในชีตภายนอก "Main Product" (คอลัมน์ A) คืนค่าคอลัมน์ P
+    const goodIdCol = finalHeaders.indexOf("custom.good_id") + 1;
+    const stockNiCol = finalHeaders.indexOf("Stock NI") + 1;
+    if (goodIdCol > 0 && stockNiCol > 0 && rows.length > 0) {
+      const goodIdLetter = columnToLetter(goodIdCol);
+      const formulas = rows.map((_, i) => {
+        const cell = `${goodIdLetter}${i + 2}`;
+        return [`=XLOOKUP(${cell}, IMPORTRANGE("1Z48qT3LXYozhlh_ZBHzn9e4x1kfX_bOLHQtaksj-ZXU","Main Product!A:A"), IMPORTRANGE("1Z48qT3LXYozhlh_ZBHzn9e4x1kfX_bOLHQtaksj-ZXU","Main Product!P:P"))`];
+      });
+      sheet.getRange(2, stockNiCol, rows.length, 1).setFormulas(formulas);
     }
 
     Logger.log("  ✅ เขียนชีท '" + sheetName + "' แล้ว " + rows.length + " แถว");
@@ -1250,6 +1286,7 @@ function epcd_ctx_() {
     edges {
       node {
         id
+        title
         status
         vendor
         descriptionHtml
@@ -1405,6 +1442,7 @@ mutation BulkQuery($query: String!) {
     const datasheet = mf["custom.datasheet"] || "";
     const linkPdf = mf["custom.link_pdf"] || "";
     const bodyHtml = p.descriptionHtml || "";
+    const title = p.title || "";
     const status = p.status || "";
     const vendor = p.vendor || "";
 
@@ -1413,6 +1451,7 @@ mutation BulkQuery($query: String!) {
       rows: pVariants.map(v => ({
         "custom.good_id": goodId,
         "Variant SKU": v.sku || "",
+        "Title": title,
         "Body (HTML)": bodyHtml,
         "Status": status,
         "custom.spapart_or_product": spVal,
@@ -1438,12 +1477,12 @@ mutation BulkQuery($query: String!) {
   }
 
   const FULL_HEADERS = [
-    "custom.good_id", "Variant SKU", "Body (HTML)", "Status", "custom.spapart_or_product",
+    "custom.good_id", "Variant SKU", "Title", "Body (HTML)", "Status", "custom.spapart_or_product",
     "Vendor", "Image Src", "image preview", "All Images", "Image count",
     "media video", "User Manual", "Datasheet", "LInk pdf"
   ];
   const SPAREPART_HEADERS = [
-    "custom.good_id", "Variant SKU", "Status", "custom.spapart_or_product",
+    "custom.good_id", "Variant SKU", "Title", "Status", "Stock NI", "custom.spapart_or_product",
     "Vendor", "Image Src", "image preview", "All Images", "Image count"
   ];
 
@@ -1534,6 +1573,18 @@ mutation BulkQuery($query: String!) {
         return [`=IF(${cell}="",0,LEN(${cell})-LEN(SUBSTITUTE(${cell},",",""))+1)`];
       });
       sheet.getRange(2, countCol, rows.length, 1).setFormulas(formulas);
+    }
+
+    // "Stock NI" (เฉพาะชีต sparepart) = XLOOKUP หา good_id ในชีตภายนอก "Main Product" (คอลัมน์ A) คืนค่าคอลัมน์ P
+    const goodIdCol = finalHeaders.indexOf("custom.good_id") + 1;
+    const stockNiCol = finalHeaders.indexOf("Stock NI") + 1;
+    if (goodIdCol > 0 && stockNiCol > 0 && rows.length > 0) {
+      const goodIdLetter = columnToLetter(goodIdCol);
+      const formulas = rows.map((_, i) => {
+        const cell = `${goodIdLetter}${i + 2}`;
+        return [`=XLOOKUP(${cell}, IMPORTRANGE("1Z48qT3LXYozhlh_ZBHzn9e4x1kfX_bOLHQtaksj-ZXU","Main Product!A:A"), IMPORTRANGE("1Z48qT3LXYozhlh_ZBHzn9e4x1kfX_bOLHQtaksj-ZXU","Main Product!P:P"))`];
+      });
+      sheet.getRange(2, stockNiCol, rows.length, 1).setFormulas(formulas);
     }
 
     Logger.log("  ✅ เขียนชีท '" + sheetName + "' แล้ว " + rows.length + " แถว");
