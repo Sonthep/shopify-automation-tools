@@ -4,7 +4,7 @@
 var SHOPIFY_SKU_CONFIG = {
   SHOP: "sevenfive-4062.myshopify.com",
   CLIENT_ID: "696e1e9162c702cc07c2f94a1beacf8a",
-  CLIENT_SECRET: "YOUR_CLIENT_SECRET",
+  CLIENT_SECRET: "YOUR_CLIENT_SECRET", // ⚠️ ถูกลบออกเพื่อความปลอดภัยตอน Push กรุณาใส่กลับใน Apps Script
   TARGET_SHEET: "update_sku", // ชื่อ Sheet สำหรับดึงข้อมูลอัปเดต SKU
   LOG_SHEET_NAME: "Log run script",
   BATCH_SIZE: 50, // จำนวน variants ต่อ 1 Direct API Call (สำหรับ Direct Batch Method)
@@ -55,37 +55,41 @@ function updateVariantSkusBulkMutation() {
   const headers = data[0].map(h => String(h).trim());
   const rows = data.slice(1);
 
-  const skuIdx = findSkuColIndex_(headers, ["Variant SKU", "VariantSKU", "New SKU", "SKU", "sku"]);
+  const webSkuIdx = findSkuColIndex_(headers, ["website sku"]);
+  const winSkuIdx = findSkuColIndex_(headers, ["winspeed sku"]);
+  const checkUpdateIdx = findSkuColIndex_(headers, ["check update"]);
   const pGidIdx = findSkuColIndex_(headers, ["Product GID", "ProductGID", "product_gid"]);
   const vGidIdx = findSkuColIndex_(headers, ["Variant GID", "VariantGID", "variant_gid"]);
 
-  const finalSkuIdx = skuIdx !== -1 ? skuIdx : 1;
-  const finalPGidIdx = pGidIdx !== -1 ? pGidIdx : 2;
-  const finalVGidIdx = vGidIdx !== -1 ? vGidIdx : 3;
+  const finalPGidIdx = pGidIdx !== -1 ? pGidIdx : 4;
+  const finalVGidIdx = vGidIdx !== -1 ? vGidIdx : 5;
 
   const jsonlLines = [];
   let skipped = 0;
 
   rows.forEach(row => {
-    const newSku = String(row[finalSkuIdx] || "").trim();
-    const pGid = String(row[finalPGidIdx] || "").trim();
-    const vGid = String(row[finalVGidIdx] || "").trim();
+    const webSku = webSkuIdx !== -1 && row[webSkuIdx] != null ? String(row[webSkuIdx]).trim() : "";
+    const winSku = winSkuIdx !== -1 && row[winSkuIdx] != null ? String(row[winSkuIdx]).trim() : "";
+    const checkUpdate = checkUpdateIdx !== -1 && row[checkUpdateIdx] != null ? String(row[checkUpdateIdx]).trim().toUpperCase() : "";
+    
+    const pGid = finalPGidIdx !== -1 && row[finalPGidIdx] != null ? String(row[finalPGidIdx]).trim() : "";
+    const vGid = finalVGidIdx !== -1 && row[finalVGidIdx] != null ? String(row[finalVGidIdx]).trim() : "";
 
-    if (!newSku || !pGid.startsWith("gid://shopify/Product/") || !vGid.startsWith("gid://shopify/ProductVariant/")) {
+    // เงื่อนไข: ต้องมีทั้ง website sku และ winspeed sku และ check update = false ถึงจะเอา winspeed sku ส่ง update
+    if (webSku && winSku && checkUpdate === "FALSE" && pGid.startsWith("gid://shopify/Product/") && vGid.startsWith("gid://shopify/ProductVariant/")) {
+      const payloadObj = {
+        productId: pGid,
+        variants: [{
+          id: vGid,
+          inventoryItem: {
+            sku: winSku
+          }
+        }]
+      };
+      jsonlLines.push(JSON.stringify(payloadObj));
+    } else {
       skipped++;
-      return;
     }
-
-    const payloadObj = {
-      productId: pGid,
-      variants: [{
-        id: vGid,
-        inventoryItem: {
-          sku: newSku
-        }
-      }]
-    };
-    jsonlLines.push(JSON.stringify(payloadObj));
   });
 
   const totalItems = jsonlLines.length;
@@ -187,13 +191,16 @@ function updateVariantSkusBulkMutation() {
       }
       
       const statusUpdates = rows.map(row => {
-        const newSku = String(row[finalSkuIdx] || "").trim();
-        const pGid = String(row[finalPGidIdx] || "").trim();
-        const vGid = String(row[finalVGidIdx] || "").trim();
-        if (newSku && pGid.startsWith("gid://shopify/Product/") && vGid.startsWith("gid://shopify/ProductVariant/")) {
+        const webSku = webSkuIdx !== -1 && row[webSkuIdx] != null ? String(row[webSkuIdx]).trim() : "";
+        const winSku = winSkuIdx !== -1 && row[winSkuIdx] != null ? String(row[winSkuIdx]).trim() : "";
+        const checkUpdate = checkUpdateIdx !== -1 && row[checkUpdateIdx] != null ? String(row[checkUpdateIdx]).trim().toUpperCase() : "";
+        const pGid = finalPGidIdx !== -1 && row[finalPGidIdx] != null ? String(row[finalPGidIdx]).trim() : "";
+        const vGid = finalVGidIdx !== -1 && row[finalVGidIdx] != null ? String(row[finalVGidIdx]).trim() : "";
+        
+        if (webSku && winSku && checkUpdate === "FALSE" && pGid.startsWith("gid://shopify/Product/") && vGid.startsWith("gid://shopify/ProductVariant/")) {
           return `🚀 Bulk Scheduled (${nowStr})`;
         }
-        return "⏭️ ข้าม (ข้อมูลไม่สมบูรณ์)";
+        return "⏭️ ข้าม (ไม่เข้าเงื่อนไข)";
       });
       
       writeStatusToSheet_(sheet, statusIdx, statusUpdates);
@@ -239,21 +246,22 @@ function updateVariantSkusFromActiveSheet() {
   const data = range.getValues();
   const headers = data[0].map(h => String(h).trim());
 
-  const skuIdx = findSkuColIndex_(headers, ["Variant SKU", "VariantSKU", "New SKU", "SKU", "sku"]);
+  const webSkuIdx = findSkuColIndex_(headers, ["website sku"]);
+  const winSkuIdx = findSkuColIndex_(headers, ["winspeed sku"]);
+  const checkUpdateIdx = findSkuColIndex_(headers, ["check update"]);
   const pGidIdx = findSkuColIndex_(headers, ["Product GID", "ProductGID", "product_gid"]);
   const vGidIdx = findSkuColIndex_(headers, ["Variant GID", "VariantGID", "variant_gid"]);
   
   let statusIdx = findSkuColIndex_(headers, ["Update Status", "Status", "Log"]);
   if (statusIdx === -1) {
-    statusIdx = 4;
+    statusIdx = headers.length; // เพิ่มต่อท้าย
     sheet.getRange(1, statusIdx + 1).setValue("Update Status").setFontWeight("bold");
   }
 
-  const finalSkuIdx = skuIdx !== -1 ? skuIdx : 1;
-  const finalPGidIdx = pGidIdx !== -1 ? pGidIdx : 2;
-  const finalVGidIdx = vGidIdx !== -1 ? vGidIdx : 3;
+  const finalPGidIdx = pGidIdx !== -1 ? pGidIdx : 4;
+  const finalVGidIdx = vGidIdx !== -1 ? vGidIdx : 5;
 
-  Logger.log(`Found columns -> SKU: Col ${finalSkuIdx + 1}, Product GID: Col ${finalPGidIdx + 1}, Variant GID: Col ${finalVGidIdx + 1}`);
+  Logger.log(`Found columns -> Product GID: Col ${finalPGidIdx + 1}, Variant GID: Col ${finalVGidIdx + 1}`);
 
   const productGroups = {};
   const statusUpdates = new Array(lastRow - 1).fill("");
@@ -261,12 +269,15 @@ function updateVariantSkusFromActiveSheet() {
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const newSku = String(row[finalSkuIdx] || "").trim();
-    const pGid = String(row[finalPGidIdx] || "").trim();
-    const vGid = String(row[finalVGidIdx] || "").trim();
+    const webSku = webSkuIdx !== -1 && row[webSkuIdx] != null ? String(row[webSkuIdx]).trim() : "";
+    const winSku = winSkuIdx !== -1 && row[winSkuIdx] != null ? String(row[winSkuIdx]).trim() : "";
+    const checkUpdate = checkUpdateIdx !== -1 && row[checkUpdateIdx] != null ? String(row[checkUpdateIdx]).trim().toUpperCase() : "";
+    
+    const pGid = finalPGidIdx !== -1 && row[finalPGidIdx] != null ? String(row[finalPGidIdx]).trim() : "";
+    const vGid = finalVGidIdx !== -1 && row[finalVGidIdx] != null ? String(row[finalVGidIdx]).trim() : "";
 
-    if (!newSku) {
-      statusUpdates[i - 1] = "⏭️ ข้าม (ไม่มี SKU)";
+    if (!webSku || !winSku || checkUpdate !== "FALSE") {
+      statusUpdates[i - 1] = "⏭️ ข้าม (ไม่เข้าเงื่อนไข)";
       continue;
     }
 
@@ -282,7 +293,7 @@ function updateVariantSkusFromActiveSheet() {
     productGroups[pGid].push({
       rowIndex: i,
       variantId: vGid,
-      newSku: newSku
+      newSku: winSku // เอา winSku ส่งไปอัปเดตเป็น variant sku ใหม่
     });
 
     totalValidRows++;

@@ -1,127 +1,402 @@
-// ============================================================
-// CONFIG
-// ============================================================
-var INV_SOURCE_SHEET = "inventory web";
-var INV_TARGET_SHEET = "Inventory";
-var INV_LOG_SHEET    = "Logrun script";
+function importColumnsBIK() {
+  const startedAt = Date.now();
 
-// Spreadsheet ID ของไฟล์ที่ใช้ XLOOKUP (Active products)
-var ACTIVE_FILE_ID = "1-7ap--3aphttTb8M0cXYvVYmRGtZQKRxoUW3nvwuUNA";
+  // ==================================================
+  // ตั้งค่าไฟล์ต้นทาง
+  // ==================================================
+  const SOURCE_ID =
+    "1-7ap--3aphttTb8M0cXYvVYmRGtZQKRxoUW3nvwuUNA";
 
-// ============================================================
-// MAIN FUNCTION
-// ============================================================
-/**
- * ดึงข้อมูลจาก Sheet "inventory web" แล้วเขียนลง Sheet "Inventory"
- *
- * Source → Target:
- *   A (Good ID)           → A
- *   B (Variant SKU)       → B
- *   -                     → C = XLOOKUP จาก Active file
- *   -                     → D = VLOOKUP จาก 'inventory web'!A:C (inventory website)
- *   -                     → E = D=C (check update)
- *   D (Inventory Item ID) → F
- */
-function syncInventorySheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const SOURCE_SHEET = "Active";
 
-  // --- 1. อ่านข้อมูลต้นทาง ---
-  const srcSheet = ss.getSheetByName(INV_SOURCE_SHEET);
-  if (!srcSheet) {
-    Logger.log("❌ ไม่พบ Sheet: " + INV_SOURCE_SHEET);
-    return;
+  // ==================================================
+  // ตั้งค่าไฟล์ปลายทาง
+  // ==================================================
+  const TARGET_ID =
+    "1FPEsVsZbIPmwEFOgnPJ8W9t7yKIS4NX5lY83gqskhcQ";
+
+  const TARGET_SHEET = "Spare Parts1";
+
+  const READ_CHUNK_SIZE = 5000;
+  const WRITE_CHUNK_SIZE = 5000;
+
+  const lock = LockService.getScriptLock();
+
+  if (!lock.tryLock(1000)) {
+    throw new Error("มีสคริปต์ importColumnsBIK กำลังทำงานอยู่");
   }
 
-  const lastRow = srcSheet.getLastRow();
-  if (lastRow < 2) {
-    Logger.log("⚠️ ไม่มีข้อมูลใน Sheet: " + INV_SOURCE_SHEET);
-    return;
+  try {
+    console.log("===== START importColumnsBIK =====");
+
+    // ==================================================
+    // 1. อ่าน Column Q เพื่อหาแถวสุดท้าย
+    // ==================================================
+    console.log("1/7 ตรวจสอบจำนวนแถวจาก Column Q");
+
+    const qResult = retrySheetsApi_(
+      function () {
+        return Sheets.Spreadsheets.Values.get(
+          SOURCE_ID,
+          `'${SOURCE_SHEET}'!Q1:Q`,
+          {
+            majorDimension: "ROWS",
+            valueRenderOption: "UNFORMATTED_VALUE"
+          }
+        );
+      },
+      "ตรวจสอบ Column Q"
+    );
+
+    const qValues = qResult.values || [];
+    const lastRow = qValues.length;
+
+    if (lastRow < 1) {
+      throw new Error(
+        `ชีต "${SOURCE_SHEET}" ไม่มีข้อมูลใน Column Q`
+      );
+    }
+
+    console.log("พบข้อมูลถึงแถว: " + lastRow);
+
+    // ==================================================
+    // 2. ตรวจสอบชีตปลายทางและจำนวนแถว
+    // ==================================================
+    console.log("2/7 ตรวจสอบชีตปลายทาง");
+
+    const targetMetadata = retrySheetsApi_(
+      function () {
+        return Sheets.Spreadsheets.get(
+          TARGET_ID,
+          {
+            fields:
+              "sheets(properties(sheetId,title,gridProperties(rowCount)))"
+          }
+        );
+      },
+      "ตรวจสอบชีตปลายทาง"
+    );
+
+    const targetSheetInfo =
+      (targetMetadata.sheets || []).find(function (sheet) {
+        return sheet.properties.title === TARGET_SHEET;
+      });
+
+    if (!targetSheetInfo) {
+      const sheetNames = (targetMetadata.sheets || [])
+        .map(function (sheet) {
+          return sheet.properties.title;
+        })
+        .join(", ");
+
+      throw new Error(
+        `ไม่พบชีตปลายทาง "${TARGET_SHEET}" ` +
+        `ชีตที่มีอยู่: ${sheetNames}`
+      );
+    }
+
+    const targetSheetId =
+      targetSheetInfo.properties.sheetId;
+
+    console.log(
+      `พบชีตปลายทาง "${TARGET_SHEET}" ` +
+      `Sheet ID: ${targetSheetId}`
+    );
+
+    // ==================================================
+    // 3. อ่าน B, C, I, K, Q แบบแบ่งช่วง
+    // ==================================================
+    console.log("3/7 เริ่มอ่านข้อมูลแบบแบ่งช่วง");
+
+    const output = [];
+
+    for (
+      let startRow = 1;
+      startRow <= lastRow;
+      startRow += READ_CHUNK_SIZE
+    ) {
+      const endRow = Math.min(
+        startRow + READ_CHUNK_SIZE - 1,
+        lastRow
+      );
+
+      console.log(
+        `กำลังอ่านแถว ${startRow}-${endRow}`
+      );
+
+      const response = retrySheetsApi_(
+        function () {
+          return Sheets.Spreadsheets.Values.batchGet(
+            SOURCE_ID,
+            {
+              ranges: [
+                `'${SOURCE_SHEET}'!B${startRow}:C${endRow}`,
+                `'${SOURCE_SHEET}'!I${startRow}:I${endRow}`,
+                `'${SOURCE_SHEET}'!K${startRow}:K${endRow}`,
+                `'${SOURCE_SHEET}'!Q${startRow}:Q${endRow}`
+              ],
+              majorDimension: "ROWS",
+              valueRenderOption: "UNFORMATTED_VALUE"
+            }
+          );
+        },
+        `อ่านแถว ${startRow}-${endRow}`
+      );
+
+      const dataBC =
+        response.valueRanges?.[0]?.values || [];
+
+      const dataI =
+        response.valueRanges?.[1]?.values || [];
+
+      const dataK =
+        response.valueRanges?.[2]?.values || [];
+
+      const dataQ =
+        response.valueRanges?.[3]?.values || [];
+
+      const numberOfRows =
+        endRow - startRow + 1;
+
+      for (let i = 0; i < numberOfRows; i++) {
+        const actualRow = startRow + i;
+
+        const columnB =
+          dataBC[i]?.[0] ?? "";
+
+        const columnC =
+          dataBC[i]?.[1] ?? "";
+
+        const columnI =
+          dataI[i]?.[0] ?? "";
+
+        const columnK =
+          dataK[i]?.[0] ?? "";
+
+        const type = String(
+          dataQ[i]?.[0] ?? ""
+        ).trim();
+
+        // หัวตารางแถวที่ 1
+        if (actualRow === 1) {
+          output.push([
+            columnB,
+            columnC,
+            columnI,
+            columnK
+          ]);
+
+          continue;
+        }
+
+        // เอาเฉพาะอะไหล่หรือสินค้าสิ้นเปลือง
+        if (
+          type === "อะไหล่" ||
+          type === "สินค้าสิ้นเปลือง"
+        ) {
+          output.push([
+            columnB,
+            columnC,
+            columnI,
+            columnK
+          ]);
+        }
+      }
+
+      console.log(
+        `อ่านถึงแถว ${endRow}/${lastRow} ` +
+        `พบข้อมูลตรงเงื่อนไข ${output.length - 1} รายการ`
+      );
+    }
+
+    if (output.length === 0) {
+      throw new Error("ไม่พบหัวตารางหรือข้อมูลสำหรับนำเข้า");
+    }
+
+    console.log(
+      "4/7 เตรียมข้อมูลสำเร็จ: " +
+      (output.length - 1) +
+      " รายการ"
+    );
+
+    // ==================================================
+    // 4. เพิ่มจำนวนแถวปลายทาง หากพื้นที่ไม่พอ
+    // ==================================================
+    const requiredRows = output.length;
+
+    const currentRowCount =
+      targetSheetInfo.properties.gridProperties.rowCount;
+
+    if (currentRowCount < requiredRows) {
+      console.log(
+        `5/7 เพิ่มแถวจาก ${currentRowCount} ` +
+        `เป็น ${requiredRows}`
+      );
+
+      retrySheetsApi_(
+        function () {
+          return Sheets.Spreadsheets.batchUpdate(
+            {
+              requests: [
+                {
+                  updateSheetProperties: {
+                    properties: {
+                      sheetId: targetSheetId,
+                      gridProperties: {
+                        rowCount: requiredRows
+                      }
+                    },
+                    fields: "gridProperties.rowCount"
+                  }
+                }
+              ]
+            },
+            TARGET_ID
+          );
+        },
+        "เพิ่มจำนวนแถวปลายทาง"
+      );
+    } else {
+      console.log(
+        "5/7 จำนวนแถวปลายทางเพียงพอ"
+      );
+    }
+
+    // ==================================================
+    // 5. ล้างข้อมูลเดิมเฉพาะ A:D
+    // ==================================================
+    console.log("6/7 ล้างข้อมูลเดิม A:D");
+
+    retrySheetsApi_(
+      function () {
+        return Sheets.Spreadsheets.Values.clear(
+          {},
+          TARGET_ID,
+          `'${TARGET_SHEET}'!A:D`
+        );
+      },
+      "ล้างข้อมูลเดิม"
+    );
+
+    // ==================================================
+    // 6. เขียนข้อมูลแบบแบ่งช่วง
+    // ==================================================
+    console.log("7/7 เริ่มเขียนข้อมูล");
+
+    for (
+      let startIndex = 0;
+      startIndex < output.length;
+      startIndex += WRITE_CHUNK_SIZE
+    ) {
+      const batch = output.slice(
+        startIndex,
+        startIndex + WRITE_CHUNK_SIZE
+      );
+
+      const destinationStartRow =
+        startIndex + 1;
+
+      const destinationEndRow =
+        destinationStartRow + batch.length - 1;
+
+      const destinationRange =
+        `'${TARGET_SHEET}'!A${destinationStartRow}` +
+        `:D${destinationEndRow}`;
+
+      retrySheetsApi_(
+        function () {
+          return Sheets.Spreadsheets.Values.update(
+            {
+              majorDimension: "ROWS",
+              values: batch
+            },
+            TARGET_ID,
+            destinationRange,
+            {
+              valueInputOption: "RAW",
+              includeValuesInResponse: false
+            }
+          );
+        },
+        `เขียนแถว ${destinationStartRow}-${destinationEndRow}`
+      );
+
+      console.log(
+        `เขียนแล้ว ${destinationEndRow}/${output.length} แถว`
+      );
+    }
+
+    console.log(
+      `นำเข้าข้อมูลสำเร็จ ${output.length - 1} รายการ`
+    );
+
+    console.log(
+      "ใช้เวลาทั้งหมด: " +
+      ((Date.now() - startedAt) / 1000).toFixed(2) +
+      " วินาที"
+    );
+
+    console.log("===== FINISH =====");
+
+  } catch (error) {
+    console.error("ERROR: " + error.message);
+    console.error(error.stack);
+    throw error;
+
+  } finally {
+    lock.releaseLock();
   }
-
-  // อ่าน col A:D ทั้งหมด (ข้าม header แถวที่ 1)
-  const srcData = srcSheet.getRange(2, 1, lastRow - 1, 4).getValues();
-  const numDataRows = srcData.length;
-
-  Logger.log("อ่านข้อมูล " + numDataRows + " แถวจาก '" + INV_SOURCE_SHEET + "'");
-
-  // --- 2. เตรียม Sheet ปลายทาง ---
-  let tgtSheet = ss.getSheetByName(INV_TARGET_SHEET);
-  if (!tgtSheet) {
-    tgtSheet = ss.insertSheet(INV_TARGET_SHEET);
-  }
-
-  // ขยาย rows/cols ให้พอก่อน clear (ป้องกัน out-of-bounds)
-  const neededRows = numDataRows + 1; // +1 header
-  if (tgtSheet.getMaxRows() < neededRows) {
-    tgtSheet.insertRowsAfter(tgtSheet.getMaxRows(), neededRows - tgtSheet.getMaxRows());
-  }
-  if (tgtSheet.getMaxColumns() < 6) {
-    tgtSheet.insertColumnsAfter(tgtSheet.getMaxColumns(), 6 - tgtSheet.getMaxColumns());
-  }
-
-  // ล้างเนื้อหาเดิม (รวม formula เก่า)
-  tgtSheet.clearContents();
-
-  // --- 3. เขียน Header ---
-  const headers = [["Good ID", "Variant SKU", "Inventory quantity", "inventory website", "check update", "Inventory Item ID"]];
-  tgtSheet.getRange(1, 1, 1, 6).setValues(headers).setFontWeight("bold");
-  tgtSheet.setFrozenRows(1);
-
-  // --- 4. เขียนค่า A, B (bulk) ---
-  const abData = srcData.map(function(row) {
-    return [
-      row[0] != null ? row[0] : "",  // A: Good ID
-      row[1] != null ? row[1] : ""   // B: Variant SKU
-    ];
-  });
-  tgtSheet.getRange(2, 1, numDataRows, 2).setValues(abData);
-
-  // --- 5. เขียนค่า F = source D (Inventory Item ID) ---
-  const fData = srcData.map(function(row) {
-    return [row[3] != null ? row[3] : ""];
-  });
-  tgtSheet.getRange(2, 6, numDataRows, 1).setValues(fData);
-
-  // --- 6. ใส่สูตร C, D, E ให้กับทุกแถว ---
-  const formulasCDE = [];
-  for (let i = 2; i <= numDataRows + 1; i++) {
-    formulasCDE.push([
-      '=XLOOKUP(A' + i + ', IMPORTRANGE("' + ACTIVE_FILE_ID + '", "\'Active\'!B2:B"), IMPORTRANGE("' + ACTIVE_FILE_ID + '", "\'Active\'!M2:M"), 0)',
-      '=VLOOKUP(A' + i + ', \'' + INV_SOURCE_SHEET + '\'!A:C, 3, FALSE)',
-      '=IF(A' + i + '="","", D' + i + '=C' + i + ')'
-    ]);
-  }
-  tgtSheet.getRange(2, 3, numDataRows, 3).setFormulas(formulasCDE);
-
-  SpreadsheetApp.flush();
-
-  const msg = "✅ Sync สำเร็จ " + numDataRows + " รายการ → '" + INV_TARGET_SHEET + "'";
-  Logger.log(msg);
-
-  // --- 8. บันทึก Log ---
-  writeInvLog_(ss, numDataRows, msg);
 }
 
-// ============================================================
-// HELPER: เขียน Log ลง Sheet "Logrun script"
-// ============================================================
-function writeInvLog_(ss, rowCount, statusMsg) {
-  try {
-    let logSheet = ss.getSheetByName(INV_LOG_SHEET);
-    if (!logSheet) {
-      logSheet = ss.insertSheet(INV_LOG_SHEET);
-      logSheet.getRange(1, 1, 1, 3)
-        .setValues([["Timestamp", "Rows", "Status"]])
-        .setFontWeight("bold");
-      logSheet.setFrozenRows(1);
+
+/**
+ * ลองเรียก Sheets API ใหม่อัตโนมัติ
+ * เมื่อเจอ 429, 500, 502, 503 หรือ 504
+ */
+function retrySheetsApi_(callback, actionName) {
+  const maxAttempts = 5;
+
+  for (
+    let attempt = 1;
+    attempt <= maxAttempts;
+    attempt++
+  ) {
+    try {
+      return callback();
+
+    } catch (error) {
+      const message =
+        String(error.message || error);
+
+      const canRetry =
+        /429|500|502|503|504|service is currently unavailable|internal error|backend error|rate limit/i
+          .test(message);
+
+      console.log(
+        `${actionName} ล้มเหลวครั้งที่ ` +
+        `${attempt}/${maxAttempts}: ${message}`
+      );
+
+      if (
+        !canRetry ||
+        attempt === maxAttempts
+      ) {
+        throw error;
+      }
+
+      const waitMilliseconds =
+        Math.min(
+          Math.pow(2, attempt) * 1000 +
+          Math.floor(Math.random() * 1000),
+          32000
+        );
+
+      console.log(
+        `รอ ${(waitMilliseconds / 1000).toFixed(1)} ` +
+        `วินาทีแล้วลองใหม่`
+      );
+
+      Utilities.sleep(waitMilliseconds);
     }
-    const ts = Utilities.formatDate(
-      new Date(),
-      Session.getScriptTimeZone(),
-      "yyyy-MM-dd HH:mm:ss"
-    );
-    logSheet.appendRow([ts, rowCount, statusMsg || "Completed"]);
-  } catch (e) {
-    Logger.log("⚠️ Log error: " + e);
   }
 }

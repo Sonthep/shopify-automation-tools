@@ -6,7 +6,7 @@ function exportProductsToSheet() {
   // 1. CONFIG & CONSTANTS (Scoped strictly inside exportProductsToSheet)
   const SHOP = PropertiesService.getScriptProperties().getProperty("SHOP") || "sevenfive-4062.myshopify.com";
   const CLIENT_ID = PropertiesService.getScriptProperties().getProperty("CLIENT_ID") || "696e1e9162c702cc07c2f94a1beacf8a";
-  const CLIENT_SECRET = PropertiesService.getScriptProperties().getProperty("CLIENT_SECRET") || "YOUR_CLIENT_SECRET";
+  const CLIENT_SECRET = PropertiesService.getScriptProperties().getProperty("CLIENT_SECRET");
   const EXPORT_SHEET_NAME = "Products Export";
   const LOG_SHEET_NAME = "Logrun script";
   const POLL_INTERVAL_MS = 10000;

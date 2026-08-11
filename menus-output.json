@@ -1,0 +1,3272 @@
+{
+  "data": {
+    "menus": {
+      "edges": [
+        {
+          "node": {
+            "id": "gid://shopify/Menu/245262352583",
+            "handle": "main-menu",
+            "title": "Main menu",
+            "items": [
+              {
+                "id": "gid://shopify/MenuItem/593610571975",
+                "title": "Home",
+                "url": "/",
+                "type": "HTTP",
+                "items": []
+              },
+              {
+                "id": "gid://shopify/MenuItem/593610670279",
+                "title": "Product",
+                "url": "/",
+                "type": "HTTP",
+                "items": [
+                  {
+                    "id": "gid://shopify/MenuItem/593610703047",
+                    "title": "Cooking Equipment",
+                    "url": "/collections/cooking-equipment",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593610735815",
+                        "title": "Automatic Cooking Machines",
+                        "url": "/collections/automatic-cooking-machines",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593610768583",
+                        "title": "Boiling Pans & Tilting Kettles",
+                        "url": "/collections/boiling-pans-tilting-kettles",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593610801351",
+                        "title": "Cooking Ranges",
+                        "url": "/collections/cooking-ranges",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593610834119",
+                        "title": "Commercial Grills",
+                        "url": "/collections/commercial-grills",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593610866887",
+                        "title": "Charcoal Cooking Equipment",
+                        "url": "/collections/charcoal-cooking-equipment",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593610899655",
+                        "title": "Commercial Exhaust Hood",
+                        "url": "/collections/commercial-exhaust-hood",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593610932423",
+                        "title": "Commercial Fryers",
+                        "url": "/collections/commercial-fryers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593610965191",
+                        "title": "Egg Boilers",
+                        "url": "/collections/egg-boilers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593610997959",
+                        "title": "Kebab Machines",
+                        "url": "/collections/kebab-machines",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611030727",
+                        "title": "Roasters & Rotisseries",
+                        "url": "/collections/roasters-rotisseries",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611063495",
+                        "title": "Pasta & Noodle Cookers",
+                        "url": "/collections/pasta-noodle-cookers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611096263",
+                        "title": "Sous Vide Circulators",
+                        "url": "/collections/sous-vide-circulators",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611129031",
+                        "title": "Rice Cookers",
+                        "url": "/collections/rice-cookers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611161799",
+                        "title": "Steamers",
+                        "url": "/collections/steamers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611194567",
+                        "title": "Outdoor Cooking Equipment",
+                        "url": "/collections/outdoor-cooking-equipment",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611227335",
+                        "title": "Smoke Machines",
+                        "url": "/collections/smoke-machines",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611260103",
+                        "title": "Oden Cooker",
+                        "url": "/collections/oden-cooker",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593611292871",
+                    "title": "Food Preparation",
+                    "url": "/collections/food-preparation",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593611325639",
+                        "title": "Automatic Sieve Machines",
+                        "url": "/collections/automatic-sieve-machines",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611358407",
+                        "title": "Commercial Food Processors",
+                        "url": "/collections/commercial-food-processors",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611391175",
+                        "title": "Can Openers & Can Crushers",
+                        "url": "/collections/can-openers-can-crushers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611423943",
+                        "title": "Food Blenders",
+                        "url": "/collections/food-blenders",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611456711",
+                        "title": "Food Dehydrators",
+                        "url": "/collections/food-dehydrators",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611489479",
+                        "title": "Grinders & Graters",
+                        "url": "/collections/grinders-graters",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611522247",
+                        "title": "Immersion Blender",
+                        "url": "/collections/immersion-blender",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611555015",
+                        "title": "Meat Processing Equipment",
+                        "url": "/collections/meat-processing-equipment",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611587783",
+                        "title": "Milling Machines",
+                        "url": "/collections/milling-machines",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611620551",
+                        "title": "Pacojet",
+                        "url": "/collections/pacojet",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611653319",
+                        "title": "Pasta Machines",
+                        "url": "/collections/pasta-machines",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611686087",
+                        "title": "Vegetable Cutter Equipment",
+                        "url": "/collections/vegetable-cutter-equipment",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611718855",
+                        "title": "Vacuum Sealers",
+                        "url": "/collections/vacuum-sealers",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593611751623",
+                    "title": "Refrigeration Equipment",
+                    "url": "/collections/refrigeration-equipment",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593611784391",
+                        "title": "Undercounter Refrigeration",
+                        "url": "/collections/undercounter-refrigeration",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611817159",
+                        "title": "Upright Refrigeration",
+                        "url": "/collections/upright-refrigeration",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611849927",
+                        "title": "Drawer Refrigeration",
+                        "url": "/collections/drawer-refrigeration",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611882695",
+                        "title": "Preparation Refrigeration",
+                        "url": "/collections/preparation-refrigeration",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611915463",
+                        "title": "Chef Bases",
+                        "url": "/collections/chef-bases",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611948231",
+                        "title": "Chest Freezers",
+                        "url": "/collections/chest-freezers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593611980999",
+                        "title": "Display Refrigeration",
+                        "url": "/collections/display-refrigeration",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612013767",
+                        "title": "Blast Chillers & Freezers",
+                        "url": "/collections/blast-chillers-freezers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612046535",
+                        "title": "Gelato & Ice Cream Showcases",
+                        "url": "/collections/gelato-ice-cream-showcases",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612079303",
+                        "title": "Ice Machines",
+                        "url": "/collections/ice-machines",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612112071",
+                        "title": "Walk-in Refrigeration",
+                        "url": "/collections/walk-in-refrigeration",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612144839",
+                        "title": "Drop-In Cold Wells",
+                        "url": "/collections/drop-in-cold-wells",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612177607",
+                        "title": "Drying Refrigeration",
+                        "url": "/collections/drying-refrigeration",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612210375",
+                        "title": "Wine Refrigeration",
+                        "url": "/collections/wine-refrigeration",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612243143",
+                        "title": "Cigar Refrigeration",
+                        "url": "/collections/cigar-refrigeration",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593612275911",
+                    "title": "Commercial Ovens",
+                    "url": "/collections/commercial-ovens",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593612308679",
+                        "title": "Combination Ovens",
+                        "url": "/collections/combination-ovens",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612341447",
+                        "title": "Conveyor Ovens",
+                        "url": "/collections/conveyor-ovens",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612374215",
+                        "title": "High Speed Ovens",
+                        "url": "/collections/high-speed-ovens",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612406983",
+                        "title": "Convection Ovens",
+                        "url": "/collections/convection-ovens",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612439751",
+                        "title": "Deck Ovens",
+                        "url": "/collections/deck-ovens",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612472519",
+                        "title": "Pizza Ovens",
+                        "url": "/collections/pizza-ovens",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612505287",
+                        "title": "Microwave Ovens",
+                        "url": "/collections/microwave-ovens",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612538055",
+                        "title": "Oven Accessories",
+                        "url": "/collections/oven-accessories",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593612570823",
+                    "title": "Bakery Equipment",
+                    "url": "/collections/bakery-equipment",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593612603591",
+                        "title": "Bread Slicers",
+                        "url": "/collections/bread-slicers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612636359",
+                        "title": "Planetary Mixers",
+                        "url": "/collections/planetary-mixers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612669127",
+                        "title": "Spiral Mixers",
+                        "url": "/collections/spiral-mixers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612701895",
+                        "title": "Double Arm Mixers",
+                        "url": "/collections/double-arm-mixers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612734663",
+                        "title": "Dough Sheeters",
+                        "url": "/collections/dough-sheeters",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612767431",
+                        "title": "Retarder Proofers",
+                        "url": "/collections/retarder-proofers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612800199",
+                        "title": "Proofers",
+                        "url": "/collections/proofers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612832967",
+                        "title": "Rolling Machines",
+                        "url": "/collections/rolling-machines",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612865735",
+                        "title": "Dough Dividers and Rounders",
+                        "url": "/collections/dough-dividers-and-rounders",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612898503",
+                        "title": "Commercial Toasters",
+                        "url": "/collections/commercial-toasters",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612931271",
+                        "title": "Crepe Machines",
+                        "url": "/collections/crepe-machines",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612964039",
+                        "title": "Waffle Machines",
+                        "url": "/collections/waffle-machines",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593612996807",
+                        "title": "Popcorn Machines",
+                        "url": "/collections/popcorn-machines",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613029575",
+                        "title": "Caramelisers",
+                        "url": "/collections/caramelisers",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593613062343",
+                    "title": "Warming Equipment",
+                    "url": "/collections/warming-equipment",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593613095111",
+                        "title": "Countertop Warmers",
+                        "url": "/collections/countertop-warmers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613127879",
+                        "title": "Strip Warmers",
+                        "url": "/collections/strip-warmers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613160647",
+                        "title": "Heat Lamps",
+                        "url": "/collections/heat-lamps",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613193415",
+                        "title": "Chocolate Warmers",
+                        "url": "/collections/chocolate-warmers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613226183",
+                        "title": "Plate Warmers",
+                        "url": "/collections/plate-warmers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613258951",
+                        "title": "Steam Warmers",
+                        "url": "/collections/steam-warmers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613291719",
+                        "title": "Rethermaliser",
+                        "url": "/collections/rethermaliser",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613324487",
+                        "title": "Drawer Warmers",
+                        "url": "/collections/drawer-warmers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613357255",
+                        "title": "Towel Warmers",
+                        "url": "/collections/towel-warmers",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593613390023",
+                    "title": "Beverage Equipment",
+                    "url": "/collections/beverage-equipment",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593613422791",
+                        "title": "Commercial Blender",
+                        "url": "/collections/commercial-blender",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613455559",
+                        "title": "Drink Mixers",
+                        "url": "/collections/drink-mixers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613488327",
+                        "title": "Juice Machines",
+                        "url": "/collections/juice-machines",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613521095",
+                        "title": "Milk Tea Shop Equipment",
+                        "url": "/collections/milk-tea-shop-equipment",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613553863",
+                        "title": "Can Openers & Can Crushers",
+                        "url": "/collections/can-openers-can-crushers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613586631",
+                        "title": "Coffee Urns",
+                        "url": "/collections/coffee-urns",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613619399",
+                        "title": "Coffee Brewers",
+                        "url": "/collections/coffee-brewers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613652167",
+                        "title": "Coffee Warmers / Boilers",
+                        "url": "/collections/coffee-warmers-boilers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613684935",
+                        "title": "Coffee Grinders",
+                        "url": "/collections/coffee-grinders",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613717703",
+                        "title": "Coffee Decanters",
+                        "url": "/collections/coffee-decanters",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613750471",
+                        "title": "Coffee Accessories",
+                        "url": "/collections/coffee-accessories",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613783239",
+                        "title": "Ice Crushers / Shavers",
+                        "url": "/collections/ice-crushers-shavers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613816007",
+                        "title": "Water Boilers",
+                        "url": "/collections/water-boilers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613848775",
+                        "title": "Beverage Dispensers",
+                        "url": "/collections/beverage-dispensers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613881543",
+                        "title": "Water Coolers",
+                        "url": "/collections/water-coolers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613914311",
+                        "title": "Slush Machines",
+                        "url": "/collections/slush-machines",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593613947079",
+                        "title": "Water filter and softener",
+                        "url": "/collections/water-filter-and-softener",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593613979847",
+                    "title": "Stainless Steel Fabrication",
+                    "url": "/collections/stainless-steel-fabrication",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593614012615",
+                        "title": "Bain Marie",
+                        "url": "/collections/bain-marie",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614045383",
+                        "title": "Cabinet",
+                        "url": "/collections/cabinet",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614078151",
+                        "title": "Chinese Range",
+                        "url": "/collections/chinese-range",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614110919",
+                        "title": "Clean Dish Table",
+                        "url": "/collections/clean-dish-table",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614143687",
+                        "title": "Cocktail Unit",
+                        "url": "/collections/cocktail-unit",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614176455",
+                        "title": "Equipment Stand",
+                        "url": "/collections/equipment-stand",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614209223",
+                        "title": "Exhaust Hood",
+                        "url": "/collections/exhaust-hood",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614241991",
+                        "title": "Grease Trap",
+                        "url": "/collections/grease-trap",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614274759",
+                        "title": "Gutter",
+                        "url": "/collections/gutter",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614307527",
+                        "title": "Ice Bin Cabinet",
+                        "url": "/collections/ice-bin-cabinet",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614340295",
+                        "title": "Noodle Range",
+                        "url": "/collections/noodle-range",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614373063",
+                        "title": "Over Hi Shelf",
+                        "url": "/collections/over-hi-shelf",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614405831",
+                        "title": "Plate Warmer",
+                        "url": "/collections/plate-warmer",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614438599",
+                        "title": "Pot Rail",
+                        "url": "/collections/pot-rail",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614471367",
+                        "title": "Stainless Steel Shelving",
+                        "url": "/collections/stainless-steel-shelving",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614504135",
+                        "title": "Sinks",
+                        "url": "/collections/sinks",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614536903",
+                        "title": "Sink Tables",
+                        "url": "/collections/sink-tables",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614569671",
+                        "title": "Soiled Dish Table",
+                        "url": "/collections/soiled-dish-table",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614602439",
+                        "title": "Soup Range",
+                        "url": "/collections/soup-range",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614635207",
+                        "title": "Stock Pot Stove",
+                        "url": "/collections/stock-pot-stove",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614667975",
+                        "title": "Thai Range",
+                        "url": "/collections/thai-range",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614700743",
+                        "title": "Tray Slide",
+                        "url": "/collections/tray-slide",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614733511",
+                        "title": "Wall Cabinet",
+                        "url": "/collections/wall-cabinet",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614766279",
+                        "title": "Wall Shelf",
+                        "url": "/collections/wall-shelf",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614799047",
+                        "title": "Work Table",
+                        "url": "/collections/work-table",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614831815",
+                        "title": "Footings",
+                        "url": "/collections/footings",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593614864583",
+                    "title": "Warewashing & Sanitisation",
+                    "url": "/collections/warewashing-sanitisation",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593614897351",
+                        "title": "Dishwashers",
+                        "url": "/collections/dishwashers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614930119",
+                        "title": "Pot & Pan Washers",
+                        "url": "/collections/pot-pan-washers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614962887",
+                        "title": "Glasswashers",
+                        "url": "/collections/glasswashers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593614995655",
+                        "title": "Warewashing Racks",
+                        "url": "/collections/warewashing-racks",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615028423",
+                        "title": "Ozone Equipment",
+                        "url": "/collections/ozone-equipment",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615061191",
+                        "title": "Sanitising Equipment",
+                        "url": "/collections/sanitising-equipment",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615093959",
+                        "title": "Warewashing Chemicals",
+                        "url": "/collections/warewashing-chemicals",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615126727",
+                        "title": "Warewashing Chemical Dispenser",
+                        "url": "/collections/warewashing-chemical-dispenser",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615159495",
+                        "title": "Warewashing Sinks & Tables",
+                        "url": "/collections/warewashing-sinks-tables",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615192263",
+                        "title": "Commercial Faucets & Plumbing",
+                        "url": "/collections/commercial-faucets-plumbing",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615225031",
+                        "title": "Glass Rinsers",
+                        "url": "/collections/glass-rinsers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615257799",
+                        "title": "Food Dehydrators",
+                        "url": "/collections/food-dehydrators",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593615290567",
+                    "title": "Storage & Transport",
+                    "url": "/collections/storage-transport",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593615323335",
+                        "title": "Shelving",
+                        "url": "/collections/shelving",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615356103",
+                        "title": "Carts & Trolleys",
+                        "url": "/collections/carts-trolleys",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615388871",
+                        "title": "Insulated Carriers",
+                        "url": "/collections/insulated-carriers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615421639",
+                        "title": "Dinnerware Storage & Transport",
+                        "url": "/collections/dinnerware-storage-transport",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615454407",
+                        "title": "Dunnage Racks",
+                        "url": "/collections/dunnage-racks",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615487175",
+                        "title": "Portable Bar",
+                        "url": "/collections/portable-bar",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593615519943",
+                    "title": "Smallwares",
+                    "url": "/collections/smallwares",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593615552711",
+                        "title": "Food Storage Supplies",
+                        "url": "/collections/food-storage-supplies",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615585479",
+                        "title": "Bar Supplies",
+                        "url": "/collections/bar-supplies",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615618247",
+                        "title": "Cookware",
+                        "url": "/collections/cookware",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615651015",
+                        "title": "Kitchen Utensils",
+                        "url": "/collections/kitchen-utensils",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615683783",
+                        "title": "Kitchen Cutlery",
+                        "url": "/collections/kitchen-cutlery",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615716551",
+                        "title": "Cutting Boards & Accessories",
+                        "url": "/collections/cutting-boards-accessories",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615749319",
+                        "title": "Commercial Scales",
+                        "url": "/collections/commercial-scales",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615782087",
+                        "title": "Thermometers",
+                        "url": "/collections/thermometers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615814855",
+                        "title": "Tongs",
+                        "url": "/collections/tongs",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615847623",
+                        "title": "Trays & Tray Stands",
+                        "url": "/collections/trays-tray-stands",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615880391",
+                        "title": "Kitchen Torches & Fuel",
+                        "url": "/collections/kitchen-torches-fuel",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615913159",
+                        "title": "Chef Clothing",
+                        "url": "/collections/chef-clothing",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615945927",
+                        "title": "Preparation Tools",
+                        "url": "/collections/preparation-tools",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593615978695",
+                        "title": "Server Supplies",
+                        "url": "/collections/server-supplies",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616011463",
+                        "title": "Kitchen Timers",
+                        "url": "/collections/kitchen-timers",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593616044231",
+                    "title": "Bakery Utensils",
+                    "url": "/collections/bakery-utensils",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593616076999",
+                        "title": "Baking Pans & Grids",
+                        "url": "/collections/baking-pans-grids",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616109767",
+                        "title": "Baking Molds",
+                        "url": "/collections/baking-molds",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616142535",
+                        "title": "Baking Tools & Utensils",
+                        "url": "/collections/baking-tools-utensils",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616175303",
+                        "title": "Decorating Tools",
+                        "url": "/collections/decorating-tools",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616208071",
+                        "title": "Proofing Baskets",
+                        "url": "/collections/proofing-baskets",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616240839",
+                        "title": "Loaf Pans",
+                        "url": "/collections/loaf-pans",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616273607",
+                        "title": "Pizza Pans & Tools",
+                        "url": "/collections/pizza-pans-tools",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593616306375",
+                    "title": "Tableware & Buffetware",
+                    "url": "/collections/tableware-buffetware",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593616339143",
+                        "title": "Dinnerware",
+                        "url": "/collections/dinnerware",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616371911",
+                        "title": "Insulated Dinnerware",
+                        "url": "/collections/insulated-dinnerware",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616404679",
+                        "title": "Flatware",
+                        "url": "/collections/flatware",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616437447",
+                        "title": "Servingware",
+                        "url": "/collections/servingware",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616470215",
+                        "title": "Plate Covers",
+                        "url": "/collections/plate-covers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616502983",
+                        "title": "Display Covers",
+                        "url": "/collections/display-covers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616535751",
+                        "title": "Condiment Servers",
+                        "url": "/collections/condiment-servers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616568519",
+                        "title": "Beverageware",
+                        "url": "/collections/beverageware",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616601287",
+                        "title": "Beverage Service",
+                        "url": "/collections/beverage-service",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616634055",
+                        "title": "Tabletop Accessories",
+                        "url": "/collections/tabletop-accessories",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616666823",
+                        "title": "Buffetware",
+                        "url": "/collections/buffetware",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593616699591",
+                    "title": "Janitorial Supplies",
+                    "url": "/collections/janitorial-supplies",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593616732359",
+                        "title": "Trays & Tray Stands",
+                        "url": "/collections/trays-tray-stands",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616765127",
+                        "title": "Janitorial Equipment",
+                        "url": "/collections/janitorial-equipment",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616797895",
+                        "title": "Cleaning Tools",
+                        "url": "/collections/cleaning-tools",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616830663",
+                        "title": "Janitorial Carts",
+                        "url": "/collections/janitorial-carts",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616863431",
+                        "title": "Trash Bins",
+                        "url": "/collections/trash-bins",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616896199",
+                        "title": "Mats",
+                        "url": "/collections/mats",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616928967",
+                        "title": "Ladders",
+                        "url": "/collections/ladders",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593616961735",
+                        "title": "Cleaning Chemicals",
+                        "url": "/collections/cleaning-chemicals",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593617354951",
+                    "title": "Furniture & Seating",
+                    "url": "/collections/furniture-seating",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593617387719",
+                        "title": "Baby Chairs",
+                        "url": "/collections/baby-chairs",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593617420487",
+                    "title": "Disposables",
+                    "url": "/collections/disposables",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593617453255",
+                        "title": "Food Label Stickers",
+                        "url": "/collections/food-label-stickers",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "gid://shopify/MenuItem/593617486023",
+                "title": "Spare Parts",
+                "url": "/pages/spare-parts",
+                "type": "PAGE",
+                "items": [
+                  {
+                    "id": "gid://shopify/MenuItem/593617518791",
+                    "title": "Consumables & Service Parts",
+                    "url": "/collections/consumables-service-parts",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593617551559",
+                        "title": "Bag",
+                        "url": "/collections/bag",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593617584327",
+                        "title": "Brush",
+                        "url": "/collections/brush",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593617617095",
+                        "title": "Cable Tie",
+                        "url": "/collections/cable-tie",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593617649863",
+                        "title": "Ceramic",
+                        "url": "/collections/ceramic",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593617682631",
+                        "title": "Chemical",
+                        "url": "/collections/chemical",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593617715399",
+                        "title": "Chopping Blade",
+                        "url": "/collections/chopping-blade",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593617748167",
+                        "title": "Cleaner",
+                        "url": "/collections/cleaner",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593617780935",
+                        "title": "Filter",
+                        "url": "/collections/filter",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593617813703",
+                        "title": "Gasket",
+                        "url": "/collections/gasket",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593617846471",
+                        "title": "Glue",
+                        "url": "/collections/glue",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593617879239",
+                        "title": "Grease",
+                        "url": "/collections/grease",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593617912007",
+                        "title": "Lubricant",
+                        "url": "/collections/lubricant",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593617944775",
+                        "title": "Mop",
+                        "url": "/collections/mop",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593617977543",
+                        "title": "Oil",
+                        "url": "/collections/oil",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618010311",
+                        "title": "O-Ring",
+                        "url": "/collections/o-ring",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618043079",
+                        "title": "Packing",
+                        "url": "/collections/packing",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618075847",
+                        "title": "Polish",
+                        "url": "/collections/polish",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618108615",
+                        "title": "Rubber",
+                        "url": "/collections/rubber",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618141383",
+                        "title": "Scouring Pad",
+                        "url": "/collections/scouring-pad",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618174151",
+                        "title": "Scraper",
+                        "url": "/collections/scraper",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618206919",
+                        "title": "Seal",
+                        "url": "/collections/seal",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618239687",
+                        "title": "Service Parts",
+                        "url": "/collections/service-parts",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618272455",
+                        "title": "Softener",
+                        "url": "/collections/softener",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618305223",
+                        "title": "Spoon",
+                        "url": "/collections/spoon",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618337991",
+                        "title": "Sticker",
+                        "url": "/collections/sticker",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618370759",
+                        "title": "Stone",
+                        "url": "/collections/stone",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618403527",
+                        "title": "Tape",
+                        "url": "/collections/tape",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618436295",
+                        "title": "Teflon",
+                        "url": "/collections/teflon",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618469063",
+                        "title": "Whip",
+                        "url": "/collections/whip",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618501831",
+                        "title": "Wipe",
+                        "url": "/collections/wipe",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593618534599",
+                    "title": "Control Boards & Sensors",
+                    "url": "/collections/control-boards-sensors",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593618567367",
+                        "title": "Control Panel",
+                        "url": "/collections/control-panel",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618600135",
+                        "title": "Controller",
+                        "url": "/collections/controller",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618632903",
+                        "title": "Converter",
+                        "url": "/collections/converter",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618665671",
+                        "title": "Display PCB",
+                        "url": "/collections/display-pcb",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618698439",
+                        "title": "Encoder",
+                        "url": "/collections/encoder",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618731207",
+                        "title": "Float Switch",
+                        "url": "/collections/float-switch",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618763975",
+                        "title": "Flow Meter",
+                        "url": "/collections/flow-meter",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618796743",
+                        "title": "Gauge",
+                        "url": "/collections/gauge",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618829511",
+                        "title": "Infrared Sensor",
+                        "url": "/collections/infrared-sensor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618862279",
+                        "title": "Inverter",
+                        "url": "/collections/inverter",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618895047",
+                        "title": "Level Switch",
+                        "url": "/collections/level-switch",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618927815",
+                        "title": "Limit Switch",
+                        "url": "/collections/limit-switch",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618960583",
+                        "title": "Magnetic Sensor",
+                        "url": "/collections/magnetic-sensor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593618993351",
+                        "title": "Main Board",
+                        "url": "/collections/main-board",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619026119",
+                        "title": "Module",
+                        "url": "/collections/module",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619058887",
+                        "title": "PCB",
+                        "url": "/collections/pcb",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619091655",
+                        "title": "Photo Sensor",
+                        "url": "/collections/photo-sensor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619124423",
+                        "title": "Position Sensor",
+                        "url": "/collections/position-sensor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619157191",
+                        "title": "Pressure Switch",
+                        "url": "/collections/pressure-switch",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619189959",
+                        "title": "Probe",
+                        "url": "/collections/probe",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619222727",
+                        "title": "Proximity Sensor",
+                        "url": "/collections/proximity-sensor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619255495",
+                        "title": "Sensor",
+                        "url": "/collections/sensor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619288263",
+                        "title": "Speed Control",
+                        "url": "/collections/speed-control",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619321031",
+                        "title": "Temp Control",
+                        "url": "/collections/temp-control",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619353799",
+                        "title": "Thermocouple",
+                        "url": "/collections/thermocouple",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619386567",
+                        "title": "Thermometers",
+                        "url": "/collections/thermometers",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619419335",
+                        "title": "Thermopile",
+                        "url": "/collections/thermopile",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619452103",
+                        "title": "Thermostat",
+                        "url": "/collections/thermostat",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619484871",
+                        "title": "Timer",
+                        "url": "/collections/timer",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619517639",
+                        "title": "Transducer",
+                        "url": "/collections/transducer",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593619550407",
+                    "title": "Electrical & Electronic Components",
+                    "url": "/collections/electrical-electronic-components",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593619583175",
+                        "title": "Ballast",
+                        "url": "/collections/ballast",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619615943",
+                        "title": "Buzzer",
+                        "url": "/collections/buzzer",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619648711",
+                        "title": "Cable",
+                        "url": "/collections/cable",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619681479",
+                        "title": "Capacitor",
+                        "url": "/collections/capacitor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619714247",
+                        "title": "Coil",
+                        "url": "/collections/coil",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619747015",
+                        "title": "Connector",
+                        "url": "/collections/connector",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619779783",
+                        "title": "Contactor",
+                        "url": "/collections/contactor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619812551",
+                        "title": "Diode",
+                        "url": "/collections/diode",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619845319",
+                        "title": "Display",
+                        "url": "/collections/display",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619878087",
+                        "title": "Door Switch",
+                        "url": "/collections/door-switch",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619910855",
+                        "title": "Fuse",
+                        "url": "/collections/fuse",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619943623",
+                        "title": "Indicator",
+                        "url": "/collections/indicator",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593619976391",
+                        "title": "Inductor",
+                        "url": "/collections/inductor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620009159",
+                        "title": "Lamp",
+                        "url": "/collections/lamp",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620041927",
+                        "title": "Lamp Holder",
+                        "url": "/collections/lamp-holder",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620074695",
+                        "title": "Light",
+                        "url": "/collections/light",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620107463",
+                        "title": "Magnet Switch",
+                        "url": "/collections/magnet-switch",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620140231",
+                        "title": "Magnetron",
+                        "url": "/collections/magnetron",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620172999",
+                        "title": "Plug",
+                        "url": "/collections/plug",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620205767",
+                        "title": "Potentiometer",
+                        "url": "/collections/potentiometer",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620238535",
+                        "title": "Power Cord",
+                        "url": "/collections/power-cord",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620271303",
+                        "title": "Relay",
+                        "url": "/collections/relay",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620304071",
+                        "title": "Resistor",
+                        "url": "/collections/resistor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620336839",
+                        "title": "Rocker Switch",
+                        "url": "/collections/rocker-switch",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620369607",
+                        "title": "Socket",
+                        "url": "/collections/socket",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620402375",
+                        "title": "Speaker",
+                        "url": "/collections/speaker",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620435143",
+                        "title": "Switch",
+                        "url": "/collections/switch",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620467911",
+                        "title": "Terminal",
+                        "url": "/collections/terminal",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620500679",
+                        "title": "Transformer",
+                        "url": "/collections/transformer",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620533447",
+                        "title": "Wire",
+                        "url": "/collections/wire",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593620566215",
+                    "title": "Mechanical & Mounting Hardware",
+                    "url": "/collections/mechanical-mounting-hardware",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593620598983",
+                        "title": "Adapter",
+                        "url": "/collections/adapter",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620631751",
+                        "title": "Adjuster",
+                        "url": "/collections/adjuster",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620664519",
+                        "title": "Bearing Housing",
+                        "url": "/collections/bearing-housing",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620697287",
+                        "title": "Bolt",
+                        "url": "/collections/bolt",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620730055",
+                        "title": "Bracket",
+                        "url": "/collections/bracket",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620762823",
+                        "title": "Bushing",
+                        "url": "/collections/bushing",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620795591",
+                        "title": "Clamp",
+                        "url": "/collections/clamp",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620828359",
+                        "title": "Clip",
+                        "url": "/collections/clip",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620861127",
+                        "title": "Coupler Shaft",
+                        "url": "/collections/coupler-shaft",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620893895",
+                        "title": "Fastener",
+                        "url": "/collections/fastener",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620926663",
+                        "title": "Frame",
+                        "url": "/collections/frame",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620959431",
+                        "title": "Guide Rail",
+                        "url": "/collections/guide-rail",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593620992199",
+                        "title": "Hinge",
+                        "url": "/collections/hinge",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621024967",
+                        "title": "Holder",
+                        "url": "/collections/holder",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621057735",
+                        "title": "Hook",
+                        "url": "/collections/hook",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621090503",
+                        "title": "Joint",
+                        "url": "/collections/joint",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621123271",
+                        "title": "Lever",
+                        "url": "/collections/lever",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621156039",
+                        "title": "Lock Nut",
+                        "url": "/collections/lock-nut",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621188807",
+                        "title": "Mount",
+                        "url": "/collections/mount",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621221575",
+                        "title": "Nut",
+                        "url": "/collections/nut",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621254343",
+                        "title": "Pin",
+                        "url": "/collections/pin",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621287111",
+                        "title": "Plate",
+                        "url": "/collections/plate",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621319879",
+                        "title": "Retainer",
+                        "url": "/collections/retainer",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621352647",
+                        "title": "Ring",
+                        "url": "/collections/ring",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621385415",
+                        "title": "Screw",
+                        "url": "/collections/screw",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621418183",
+                        "title": "Spacer",
+                        "url": "/collections/spacer",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621450951",
+                        "title": "Spring Mount",
+                        "url": "/collections/spring-mount",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621483719",
+                        "title": "Stopper",
+                        "url": "/collections/stopper",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621516487",
+                        "title": "Support",
+                        "url": "/collections/support",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621549255",
+                        "title": "Washer",
+                        "url": "/collections/washer",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593621582023",
+                    "title": "Safety & Protection Devices",
+                    "url": "/collections/safety-protection-devices",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593621614791",
+                        "title": "Alarm",
+                        "url": "/collections/alarm",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621647559",
+                        "title": "Barrier",
+                        "url": "/collections/barrier",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621680327",
+                        "title": "Breaker",
+                        "url": "/collections/breaker",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621713095",
+                        "title": "Circuit Protector",
+                        "url": "/collections/circuit-protector",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621745863",
+                        "title": "Cover Plate",
+                        "url": "/collections/cover-plate",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621778631",
+                        "title": "Earth Leakage",
+                        "url": "/collections/earth-leakage",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621811399",
+                        "title": "Emergency Stop Button",
+                        "url": "/collections/emergency-stop-button",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621844167",
+                        "title": "Emergency Switch",
+                        "url": "/collections/emergency-switch",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621876935",
+                        "title": "Fuse Box",
+                        "url": "/collections/fuse-box",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621909703",
+                        "title": "Fuse Holder",
+                        "url": "/collections/fuse-holder",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621942471",
+                        "title": "Fuse Link",
+                        "url": "/collections/fuse-link",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593621975239",
+                        "title": "Guard Plate",
+                        "url": "/collections/guard-plate",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622008007",
+                        "title": "Heat Shield",
+                        "url": "/collections/heat-shield",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622040775",
+                        "title": "Indicator Lamp",
+                        "url": "/collections/indicator-lamp",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622073543",
+                        "title": "Isolation Switch",
+                        "url": "/collections/isolation-switch",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622106311",
+                        "title": "Lockout Device",
+                        "url": "/collections/lockout-device",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622139079",
+                        "title": "Overload",
+                        "url": "/collections/overload",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622171847",
+                        "title": "Protective Cap",
+                        "url": "/collections/protective-cap",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622204615",
+                        "title": "Relay Socket",
+                        "url": "/collections/relay-socket",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622237383",
+                        "title": "Reset Switch",
+                        "url": "/collections/reset-switch",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622270151",
+                        "title": "Safety Barrier",
+                        "url": "/collections/safety-barrier",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622302919",
+                        "title": "Safety Cover",
+                        "url": "/collections/safety-cover",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622335687",
+                        "title": "Safety Switch",
+                        "url": "/collections/safety-switch",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622368455",
+                        "title": "Sensor Alarm",
+                        "url": "/collections/sensor-alarm",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622401223",
+                        "title": "Shield",
+                        "url": "/collections/shield",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622433991",
+                        "title": "Surge Protector",
+                        "url": "/collections/surge-protector",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622466759",
+                        "title": "Switch Guard",
+                        "url": "/collections/switch-guard",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622499527",
+                        "title": "Thermal Cutoff",
+                        "url": "/collections/thermal-cutoff",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622532295",
+                        "title": "Thermal Relay",
+                        "url": "/collections/thermal-relay",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593622565063",
+                    "title": "Structural & Access Components",
+                    "url": "/collections/structural-access-components",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593622597831",
+                        "title": "Access Handle",
+                        "url": "/collections/access-handle",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622630599",
+                        "title": "Access Hinge",
+                        "url": "/collections/access-hinge",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622663367",
+                        "title": "Access Panel",
+                        "url": "/collections/access-panel",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622696135",
+                        "title": "Access Plate",
+                        "url": "/collections/access-plate",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622728903",
+                        "title": "Body",
+                        "url": "/collections/body",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622761671",
+                        "title": "Case",
+                        "url": "/collections/case",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622794439",
+                        "title": "Cover",
+                        "url": "/collections/cover",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622827207",
+                        "title": "Divider Bar",
+                        "url": "/collections/divider-bar",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622859975",
+                        "title": "Door",
+                        "url": "/collections/door",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622892743",
+                        "title": "Door Lock",
+                        "url": "/collections/door-lock",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622925511",
+                        "title": "Door Seal",
+                        "url": "/collections/door-seal",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622958279",
+                        "title": "Door Spring",
+                        "url": "/collections/door-spring",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593622991047",
+                        "title": "Enclosure",
+                        "url": "/collections/enclosure",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623023815",
+                        "title": "Frame Guard",
+                        "url": "/collections/frame-guard",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623056583",
+                        "title": "Grill Cover",
+                        "url": "/collections/grill-cover",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623089351",
+                        "title": "Grille",
+                        "url": "/collections/grille",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623122119",
+                        "title": "Guard",
+                        "url": "/collections/guard",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623154887",
+                        "title": "Hatch",
+                        "url": "/collections/hatch",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623187655",
+                        "title": "Housing",
+                        "url": "/collections/housing",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623220423",
+                        "title": "Insulator",
+                        "url": "/collections/insulator",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623253191",
+                        "title": "Latch",
+                        "url": "/collections/latch",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623285959",
+                        "title": "Lid",
+                        "url": "/collections/lid",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623318727",
+                        "title": "Panel",
+                        "url": "/collections/panel",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623351495",
+                        "title": "Partition",
+                        "url": "/collections/partition",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623384263",
+                        "title": "Protection",
+                        "url": "/collections/protection",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623417031",
+                        "title": "Seal Frame",
+                        "url": "/collections/seal-frame",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623449799",
+                        "title": "Trim",
+                        "url": "/collections/trim",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623482567",
+                        "title": "Vent Panel",
+                        "url": "/collections/vent-panel",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593623515335",
+                        "title": "Window",
+                        "url": "/collections/window",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593624531143",
+                    "title": "Heating, Ignition & Gas Parts",
+                    "url": "/collections/heating-ignition-gas-parts",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593624563911",
+                        "title": "Boiler",
+                        "url": "/collections/boiler",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593624596679",
+                        "title": "Burner",
+                        "url": "/collections/burner",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593624629447",
+                        "title": "Ceramic Heater",
+                        "url": "/collections/ceramic-heater",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593624662215",
+                        "title": "Electrode",
+                        "url": "/collections/electrode",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593624694983",
+                        "title": "Flame Rod",
+                        "url": "/collections/flame-rod",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593624727751",
+                        "title": "Flame Sensor",
+                        "url": "/collections/flame-sensor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625481415",
+                        "title": "Gas Regulator",
+                        "url": "/collections/gas-regulator",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625514183",
+                        "title": "Gas Tube",
+                        "url": "/collections/gas-tube",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625546951",
+                        "title": "Gas Valve",
+                        "url": "/collections/gas-valve",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625579719",
+                        "title": "Heat Exchanger",
+                        "url": "/collections/heat-exchanger",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625612487",
+                        "title": "Heater",
+                        "url": "/collections/heater",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625645255",
+                        "title": "Heater Element",
+                        "url": "/collections/heater-element",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625678023",
+                        "title": "Heating Plate",
+                        "url": "/collections/heating-plate",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625710791",
+                        "title": "Ignitor",
+                        "url": "/collections/ignitor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625743559",
+                        "title": "Infrared Heater",
+                        "url": "/collections/infrared-heater",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625776327",
+                        "title": "Main Gas",
+                        "url": "/collections/main-gas",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625809095",
+                        "title": "Oven Burner",
+                        "url": "/collections/oven-burner",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625841863",
+                        "title": "Piezo",
+                        "url": "/collections/piezo",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625874631",
+                        "title": "Pilot",
+                        "url": "/collections/pilot",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625907399",
+                        "title": "Pilot Assembly",
+                        "url": "/collections/pilot-assembly",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625940167",
+                        "title": "Pilot Burner",
+                        "url": "/collections/pilot-burner",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593625972935",
+                        "title": "Pilot Injector",
+                        "url": "/collections/pilot-injector",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593626005703",
+                        "title": "Pilot Valve",
+                        "url": "/collections/pilot-valve",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593626038471",
+                        "title": "Quartz Tube",
+                        "url": "/collections/quartz-tube",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593626071239",
+                        "title": "Quartz Tube Heater",
+                        "url": "/collections/quartz-tube-heater",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593626104007",
+                        "title": "Spark Plug",
+                        "url": "/collections/spark-plug",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593626136775",
+                        "title": "Temperature Sensor",
+                        "url": "/collections/temperature-sensor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593626169543",
+                        "title": "Thermal Fuse",
+                        "url": "/collections/thermal-fuse",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593626202311",
+                        "title": "Thermo Fuse",
+                        "url": "/collections/thermo-fuse",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593626235079",
+                        "title": "Thermostat Rod",
+                        "url": "/collections/thermostat-rod",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593626923207",
+                    "title": "Motors, Fans & Actuators",
+                    "url": "/collections/motors-fans-actuators",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593626955975",
+                        "title": "Actuator",
+                        "url": "/collections/actuator",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593626988743",
+                        "title": "Armature",
+                        "url": "/collections/armature",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627021511",
+                        "title": "Bearing",
+                        "url": "/collections/bearing",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627054279",
+                        "title": "Blower",
+                        "url": "/collections/blower",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627087047",
+                        "title": "Clutch",
+                        "url": "/collections/clutch",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627119815",
+                        "title": "Coupling",
+                        "url": "/collections/coupling",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627152583",
+                        "title": "Drive Belt",
+                        "url": "/collections/drive-belt",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627185351",
+                        "title": "Drive Unit",
+                        "url": "/collections/drive-unit",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627218119",
+                        "title": "Fan",
+                        "url": "/collections/fan",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627250887",
+                        "title": "Gear",
+                        "url": "/collections/gear",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627283655",
+                        "title": "Gearbox",
+                        "url": "/collections/gearbox",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627316423",
+                        "title": "Linear Actuator",
+                        "url": "/collections/linear-actuator",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627578567",
+                        "title": "Motor",
+                        "url": "/collections/motor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627611335",
+                        "title": "Motor Bracket",
+                        "url": "/collections/motor-bracket",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627644103",
+                        "title": "Motor Bushing",
+                        "url": "/collections/motor-bushing",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627676871",
+                        "title": "Motor Frame",
+                        "url": "/collections/motor-frame",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627709639",
+                        "title": "Motor Mount",
+                        "url": "/collections/motor-mount",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627742407",
+                        "title": "Motor Pin",
+                        "url": "/collections/motor-pin",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627775175",
+                        "title": "Motor Plate",
+                        "url": "/collections/motor-plate",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627807943",
+                        "title": "Motor Ring",
+                        "url": "/collections/motor-ring",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627840711",
+                        "title": "Motor Spacer",
+                        "url": "/collections/motor-spacer",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627873479",
+                        "title": "Motor Stopper",
+                        "url": "/collections/motor-stopper",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627906247",
+                        "title": "Motor Support",
+                        "url": "/collections/motor-support",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627939015",
+                        "title": "Pulley",
+                        "url": "/collections/pulley",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593627971783",
+                        "title": "Rotor",
+                        "url": "/collections/rotor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593628004551",
+                        "title": "Servo Motor",
+                        "url": "/collections/servo-motor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593628037319",
+                        "title": "Shaft",
+                        "url": "/collections/shaft",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593628070087",
+                        "title": "Spring",
+                        "url": "/collections/spring",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593628102855",
+                        "title": "Startor",
+                        "url": "/collections/startor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593628135623",
+                        "title": "Stator",
+                        "url": "/collections/stator",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593628758215",
+                    "title": "Pumps, Compressors & Fluid Systems",
+                    "url": "/collections/pumps-compressors-fluid-systems",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593628790983",
+                        "title": "Check Valve",
+                        "url": "/collections/check-valve",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593628823751",
+                        "title": "Compressor",
+                        "url": "/collections/compressor",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593628856519",
+                        "title": "Condenser",
+                        "url": "/collections/condenser",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593628889287",
+                        "title": "Coupler",
+                        "url": "/collections/coupler",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593628922055",
+                        "title": "Drain",
+                        "url": "/collections/drain",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593628954823",
+                        "title": "Drain Plug",
+                        "url": "/collections/drain-plug",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593628987591",
+                        "title": "Evaporator",
+                        "url": "/collections/evaporator",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629020359",
+                        "title": "Expansion Valve",
+                        "url": "/collections/expansion-valve",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629053127",
+                        "title": "Faucet",
+                        "url": "/collections/faucet",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629085895",
+                        "title": "Fitting",
+                        "url": "/collections/fitting",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629118663",
+                        "title": "Float Valve",
+                        "url": "/collections/float-valve",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629151431",
+                        "title": "Flow Regulator",
+                        "url": "/collections/flow-regulator",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629184199",
+                        "title": "Fluid Filter",
+                        "url": "/collections/fluid-filter",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629216967",
+                        "title": "Hose",
+                        "url": "/collections/hose",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629249735",
+                        "title": "Hydraulic Pump",
+                        "url": "/collections/hydraulic-pump",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629282503",
+                        "title": "Manifold",
+                        "url": "/collections/manifold",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629315271",
+                        "title": "Nozzle",
+                        "url": "/collections/nozzle",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629348039",
+                        "title": "Pipe",
+                        "url": "/collections/pipe",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629380807",
+                        "title": "Pipe Clamp",
+                        "url": "/collections/pipe-clamp",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629413575",
+                        "title": "Pipe Connector",
+                        "url": "/collections/pipe-connector",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629446343",
+                        "title": "Pressure Gauge",
+                        "url": "/collections/pressure-gauge",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629479111",
+                        "title": "Pump",
+                        "url": "/collections/pump",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629511879",
+                        "title": "Regulator",
+                        "url": "/collections/regulator",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629544647",
+                        "title": "Solenoid",
+                        "url": "/collections/solenoid",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629577415",
+                        "title": "Spray Nozzle",
+                        "url": "/collections/spray-nozzle",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629610183",
+                        "title": "Tank",
+                        "url": "/collections/tank",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629642951",
+                        "title": "Tap",
+                        "url": "/collections/tap",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629675719",
+                        "title": "Union Joint",
+                        "url": "/collections/union-joint",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629708487",
+                        "title": "Vacuum Pump",
+                        "url": "/collections/vacuum-pump",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593629741255",
+                        "title": "Valve",
+                        "url": "/collections/valve",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593630855367",
+                    "title": "Storage, Handling & Mobility",
+                    "url": "/collections/storage-handling-mobility",
+                    "type": "COLLECTION",
+                    "items": [
+                      {
+                        "id": "gid://shopify/MenuItem/593630888135",
+                        "title": "Basket",
+                        "url": "/collections/basket",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593630920903",
+                        "title": "Bin",
+                        "url": "/collections/bin",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593630953671",
+                        "title": "Bowl",
+                        "url": "/collections/bowl",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593630986439",
+                        "title": "Caddy",
+                        "url": "/collections/caddy",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631019207",
+                        "title": "Cart",
+                        "url": "/collections/cart",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631051975",
+                        "title": "Caster Wheel",
+                        "url": "/collections/caster-wheel",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631084743",
+                        "title": "Container",
+                        "url": "/collections/container",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631117511",
+                        "title": "Drawer",
+                        "url": "/collections/drawer",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631150279",
+                        "title": "Drawer Rail",
+                        "url": "/collections/drawer-rail",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631183047",
+                        "title": "Foot",
+                        "url": "/collections/foot",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631215815",
+                        "title": "Frame Base",
+                        "url": "/collections/frame-base",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631248583",
+                        "title": "Frame Support",
+                        "url": "/collections/frame-support",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631281351",
+                        "title": "Handle Grip",
+                        "url": "/collections/handle-grip",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631314119",
+                        "title": "Leg",
+                        "url": "/collections/leg",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631346887",
+                        "title": "Pan",
+                        "url": "/collections/pan",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631379655",
+                        "title": "Platform",
+                        "url": "/collections/platform",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631412423",
+                        "title": "Rack",
+                        "url": "/collections/rack",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631445191",
+                        "title": "Roller",
+                        "url": "/collections/roller",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631477959",
+                        "title": "Shelf",
+                        "url": "/collections/shelf",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631510727",
+                        "title": "Stand",
+                        "url": "/collections/stand",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631543495",
+                        "title": "Storage Box",
+                        "url": "/collections/storage-box",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631576263",
+                        "title": "Table Stand",
+                        "url": "/collections/table-stand",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631609031",
+                        "title": "Tool Holder",
+                        "url": "/collections/tool-holder",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631641799",
+                        "title": "Tray",
+                        "url": "/collections/tray",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631674567",
+                        "title": "Tray Holder",
+                        "url": "/collections/tray-holder",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631707335",
+                        "title": "Trolley",
+                        "url": "/collections/trolley",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631740103",
+                        "title": "Utensil Holder",
+                        "url": "/collections/utensil-holder",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631772871",
+                        "title": "Wheel",
+                        "url": "/collections/wheel",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631805639",
+                        "title": "Wheel Stopper",
+                        "url": "/collections/wheel-stopper",
+                        "type": "COLLECTION"
+                      },
+                      {
+                        "id": "gid://shopify/MenuItem/593631838407",
+                        "title": "Table",
+                        "url": "/collections/table",
+                        "type": "COLLECTION"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "gid://shopify/MenuItem/593616994503",
+                "title": "Hotel Supplies",
+                "url": "/collections/hotel-supplies",
+                "type": "COLLECTION",
+                "items": [
+                  {
+                    "id": "gid://shopify/MenuItem/593617027271",
+                    "title": "Refrigeration",
+                    "url": "/collections/refrigeration",
+                    "type": "COLLECTION",
+                    "items": []
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593617060039",
+                    "title": "Safe Boxes",
+                    "url": "/collections/safe-boxes",
+                    "type": "COLLECTION",
+                    "items": []
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593617092807",
+                    "title": "Electric Kettles",
+                    "url": "/collections/electric-kettles",
+                    "type": "COLLECTION",
+                    "items": []
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593617125575",
+                    "title": "Bath Mats",
+                    "url": "/collections/bath-mats",
+                    "type": "COLLECTION",
+                    "items": []
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593617158343",
+                    "title": "Luggage Racks",
+                    "url": "/collections/luggage-racks",
+                    "type": "COLLECTION",
+                    "items": []
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593617191111",
+                    "title": "Torches",
+                    "url": "/collections/torches",
+                    "type": "COLLECTION",
+                    "items": []
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593617223879",
+                    "title": "Bed & Bath Linens",
+                    "url": "/collections/bed-bath-linens",
+                    "type": "COLLECTION",
+                    "items": []
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593617256647",
+                    "title": "Lobby Supplies",
+                    "url": "/collections/lobby-supplies",
+                    "type": "COLLECTION",
+                    "items": []
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593617289415",
+                    "title": "Bathroom Accessories",
+                    "url": "/collections/bathroom-accessories",
+                    "type": "COLLECTION",
+                    "items": []
+                  },
+                  {
+                    "id": "gid://shopify/MenuItem/593617322183",
+                    "title": "Telephone",
+                    "url": "/collections/telephone",
+                    "type": "COLLECTION",
+                    "items": []
+                  }
+                ]
+              },
+              {
+                "id": "gid://shopify/MenuItem/599593418951",
+                "title": "Services",
+                "url": "/",
+                "type": "FRONTPAGE",
+                "items": []
+              },
+              {
+                "id": "gid://shopify/MenuItem/593610637511",
+                "title": "Brand",
+                "url": "/pages/brand",
+                "type": "PAGE",
+                "items": []
+              },
+              {
+                "id": "gid://shopify/MenuItem/593610604743",
+                "title": "Catalogue",
+                "url": "/pages/catalog",
+                "type": "PAGE",
+                "items": []
+              },
+              {
+                "id": "gid://shopify/MenuItem/593623548103",
+                "title": "Blog",
+                "url": "/blogs/news",
+                "type": "BLOG",
+                "items": []
+              }
+            ]
+          }
+        },
+        {
+          "node": {
+            "id": "gid://shopify/Menu/245262385351",
+            "handle": "footer",
+            "title": "Footer menu",
+            "items": [
+              {
+                "id": "gid://shopify/MenuItem/588711493831",
+                "title": "Search",
+                "url": "/search",
+                "type": "SEARCH",
+                "items": []
+              }
+            ]
+          }
+        },
+        {
+          "node": {
+            "id": "gid://shopify/Menu/245262418119",
+            "handle": "customer-account-main-menu",
+            "title": "Customer account main menu",
+            "items": [
+              {
+                "id": "gid://shopify/MenuItem/588711526599",
+                "title": "Orders",
+                "url": "https://shopify.com/76699762887/account/orders",
+                "type": "CUSTOMER_ACCOUNT_PAGE",
+                "items": []
+              },
+              {
+                "id": "gid://shopify/MenuItem/588711559367",
+                "title": "Profile",
+                "url": "https://shopify.com/76699762887/account/profile",
+                "type": "CUSTOMER_ACCOUNT_PAGE",
+                "items": []
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "extensions": {
+    "cost": {
+      "requestedQueryCost": 30,
+      "actualQueryCost": 10,
+      "throttleStatus": {
+        "maximumAvailable": 2000,
+        "currentlyAvailable": 1990,
+        "restoreRate": 100
+      }
+    }
+  }
+}
