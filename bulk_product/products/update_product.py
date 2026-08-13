@@ -5,13 +5,14 @@ import sys
 import csv
 import json
 import os
+import re
 import time
 import argparse
 
 import pandas as pd
 import requests
 
-from utils import make_headers, get_val, gql, read_csv_auto, API_URL, get_variant_gids_by_skus
+from utils import make_headers, get_val, gql, read_csv_auto, API_URL, get_variant_gids_by_skus, get_product_gids_by_skus
 
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
@@ -37,6 +38,9 @@ COL = {
     "inventory_item_id":  "Inventory Item ID",
 }
 
+# ── Image column mapping ──────────────────────────────────────
+IMAGE_COLS = ["Image Src", "Image URL", "Image Link", "image_url", "Images", "Image"]
+
 # ── Thai translation ──────────────────────────────────────────
 LOCALE   = "th"
 COL_THAI = {
@@ -53,7 +57,8 @@ def build_metafields(row):
         "Vendor", "Type", "Tags", "Status", "Price", "Compare At Price",
         "New SKU", "Inventory quantity", "Inventory Item ID", "Sales Channels",
         "Published Channels", "Title TH", "Body (HTML) TH", "meta_title",
-        "meta_description"
+        "meta_description", "Image Src", "Image URL", "Image Link", "image_url",
+        "Images", "Image"
     }
     metafields = []
     for col in row.index:
@@ -109,13 +114,35 @@ def sanitize_price(val):
         return val_str
 
 
+# ── Google Drive share link -> direct-fetchable image URL ─────
+_DRIVE_ID_PATTERNS = [
+    re.compile(r"drive\.google\.com/file/d/([a-zA-Z0-9_-]+)"),
+    re.compile(r"drive\.google\.com/open\?id=([a-zA-Z0-9_-]+)"),
+    re.compile(r"drive\.google\.com/uc\?(?:export=download&)?id=([a-zA-Z0-9_-]+)"),
+]
+
+
+def convert_drive_url(url: str) -> str:
+    """Convert a Google Drive share/view link to a direct-fetchable image URL.
+    Shopify's productCreateMedia fetches originalSource itself and needs raw
+    image bytes, not the Drive viewer HTML page — plain share links fail silently.
+    Requires the file to be shared as "Anyone with the link".
+    """
+    for pattern in _DRIVE_ID_PATTERNS:
+        m = pattern.search(url)
+        if m:
+            return f"https://lh3.googleusercontent.com/d/{m.group(1)}"
+    return url
+
+
 # ── Product update (Bulk API) ─────────────────────────────────
 
-def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, list, list]:
+def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, list, list, list]:
     """Read GIDs directly from CSV — no API lookups.
-    Returns (count, inv_entries, price_entries)
+    Returns (count, inv_entries, price_entries, image_entries)
       inv_entries   = [{inventoryItemId, locationId, quantity}]
       price_entries = [{productId, variantId, price, compareAtPrice}]
+      image_entries = [{productId, media: [{mediaContentType: "IMAGE", originalSource: url}]}]
     """
     df = read_csv_auto(csv_file)
     print(f"Columns found: {df.columns.tolist()}")
@@ -127,16 +154,26 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, list, list]:
     has_product_gid = gid_col in df.columns
     has_variant_gid = var_gid_col in df.columns
 
-    if not has_product_gid and not has_variant_gid:
-        print(f"[ERR] Need '{gid_col}' or '{var_gid_col}'. Available: {df.columns.tolist()}")
-        return 0, [], []
+    # Detect SKU column
+    sku_col = None
+    for candidate in [COL["sku"], "sku", "SKU"]:
+        if candidate in df.columns:
+            sku_col = candidate
+            break
+
+    if not has_product_gid and not has_variant_gid and sku_col is None:
+        print(f"[ERR] Need '{gid_col}', '{var_gid_col}', or SKU column. Available: {df.columns.tolist()}")
+        return 0, [], [], []
 
     inv_entries:   list = []
     price_entries: list = []
+    image_entries: list = []
     count = 0
 
+    # Detect Image columns
+    image_col_found = [c for c in IMAGE_COLS if c in df.columns]
+
     # If the CSV contains SKUs but not Variant GIDs, resolve SKUs -> variant GIDs
-    sku_col = COL["sku"] if COL["sku"] in df.columns else None
     need_variant_resolution = (COL["variant_gid"] not in df.columns) and (sku_col is not None)
     variant_gid_map = {}
     if need_variant_resolution:
@@ -147,6 +184,17 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, list, list]:
                 variant_gid_map = get_variant_gids_by_skus(API_URL, HEADERS, skus)
         except Exception as e:
             print(f"  [WARN] Failed to resolve SKUs to variant GIDs: {e}")
+
+    # Resolve product GIDs for SKUs if image column is present and product GID is not directly in CSV
+    product_gid_map = {}
+    if image_col_found and not has_product_gid and sku_col is not None:
+        try:
+            skus = df[sku_col].dropna().unique().tolist()
+            if skus:
+                print(f"Resolving {len(skus)} SKUs to product GIDs for image updates...")
+                product_gid_map = get_product_gids_by_skus(API_URL, HEADERS, skus)
+        except Exception as e:
+            print(f"  [WARN] Failed to resolve SKUs to product GIDs for images: {e}")
 
     # If CSV has Product GIDs and price but no VariantGID/SKU, resolve product -> variant IDs
     need_variant_from_product = has_product_gid and (COL["variant_gid"] not in df.columns) and (sku_col is None)
@@ -324,8 +372,31 @@ def build_jsonl(csv_file: str, jsonl_file: str) -> tuple[int, list, list]:
                             entry["sku"] = sku_to_set
                         price_entries.append(entry)
 
-    print(f"{count} product rows -> {jsonl_file} | {len(inv_entries)} inv | {len(price_entries)} price")
-    return count, inv_entries, price_entries
+            # ── Images (URL Links) ──
+            if image_col_found:
+                raw_img_urls = []
+                for c in image_col_found:
+                    v = get_val(row, c)
+                    if v:
+                        for part in re.split(r'[\r\n,;]+', v):
+                            cleaned_url = part.strip()
+                            if cleaned_url and (cleaned_url.startswith("http://") or cleaned_url.startswith("https://")):
+                                raw_img_urls.append(convert_drive_url(cleaned_url))
+                
+                if raw_img_urls:
+                    target_product_id = gid if has_product_gid else (product_gid_map.get(get_val(row, sku_col)) if sku_col else None)
+                    if not target_product_id and var_gid_col in df.columns:
+                        variant_gid_val = get_val(row, var_gid_col)
+                        target_product_id = variant_to_product_map.get(variant_gid_val)
+
+                    if target_product_id:
+                        image_entries.append({
+                            "productId": target_product_id,
+                            "media": [{"mediaContentType": "IMAGE", "originalSource": u} for u in raw_img_urls]
+                        })
+
+    print(f"{count} product rows -> {jsonl_file} | {len(inv_entries)} inv | {len(price_entries)} price | {len(image_entries)} image")
+    return count, inv_entries, price_entries, image_entries
 
 
 def create_staged_upload(filename: str = "bulk.jsonl") -> dict | None:
@@ -407,6 +478,50 @@ def run_price_bulk_mutation(resource_url: str) -> dict | None:
         print(f"Price bulk mutation error: {op['userErrors']}")
         return None
     print(f"Price bulk operation started: {op['bulkOperation']['id']}")
+    return op
+
+
+def build_image_jsonl(image_entries: list, jsonl_file: str) -> int:
+    """Build JSONL for productCreateMedia bulk mutation."""
+    count = 0
+    with open(jsonl_file, "w", encoding="utf-8") as f:
+        for entry in image_entries:
+            if not entry.get("productId") or not entry.get("media"):
+                continue
+            payload = {
+                "productId": entry["productId"],
+                "media": entry["media"]
+            }
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+            count += 1
+    print(f"{count} image rows -> {jsonl_file}")
+    return count
+
+
+def run_image_bulk_mutation(resource_url: str) -> dict | None:
+    mutation = """
+    mutation bulkImageUpdate($stagedUploadPath: String!) {
+      bulkOperationRunMutation(
+        mutation: "mutation mediaCreate($productId: ID!, $media: [CreateMediaInput!]!) {
+          productCreateMedia(productId: $productId, media: $media) {
+            media { id status }
+            mediaUserErrors { field message }
+          }
+        }",
+        stagedUploadPath: $stagedUploadPath
+      ) {
+        bulkOperation { id status }
+        userErrors { field message }
+      }
+    }"""
+    body = gql(API_URL, HEADERS, mutation, {"stagedUploadPath": resource_url})
+    if not body:
+        return None
+    op = body["data"]["bulkOperationRunMutation"]
+    if op["userErrors"]:
+        print(f"Image bulk mutation error: {op['userErrors']}")
+        return None
+    print(f"Image bulk operation started: {op['bulkOperation']['id']}")
     return op
 
 
@@ -734,6 +849,8 @@ if __name__ == "__main__":
     parser.add_argument("--thai",     action="store_true",           help="Run Thai translation update (auto-detected if Thai columns exist)")
     parser.add_argument("--no-thai",  action="store_true",           help="Skip Thai translation even if Thai columns exist")
     parser.add_argument("--thai-csv", default="",                    help="Thai CSV (default: same as --csv)")
+    parser.add_argument("--image-csv", default="",                   help="Image CSV (default: same as --csv)")
+    parser.add_argument("--no-image", action="store_true",          help="Skip image update even if image columns exist")
     args = parser.parse_args()
 
     base_dir   = os.path.dirname(__file__)
@@ -749,11 +866,12 @@ if __name__ == "__main__":
 
     inv_entries:   list = []
     price_entries: list = []
+    image_entries: list = []
 
     # ── 1. Product fields update ──
     if not args.inv_only:
         print(f"Using CSV: {CSV_FILE}")
-        count, inv_entries, price_entries = build_jsonl(CSV_FILE, JSONL_FILE)
+        count, inv_entries, price_entries, image_entries = build_jsonl(CSV_FILE, JSONL_FILE)
 
         if count > 0:
             target = create_staged_upload()
@@ -785,6 +903,23 @@ if __name__ == "__main__":
                     print(f"Price bulk done. Result URL: {result_url}")
                 else:
                     print("  Price bulk mutation did not start.")
+
+        # ── 1c. Image link update ──
+        if image_entries and not args.no_image:
+            print(f"\nImage update for {len(image_entries)} product(s)...")
+            image_jsonl = os.path.join(base_dir, "output", "image_bulk.jsonl")
+            build_image_jsonl(image_entries, image_jsonl)
+            target = create_staged_upload("image_bulk.jsonl")
+            if not target:
+                print("  Failed to create staged upload for images.")
+            else:
+                resource_url = upload_jsonl(target, image_jsonl)
+                op = run_image_bulk_mutation(resource_url)
+                if op:
+                    result_url = poll_status()
+                    print(f"Image bulk done. Result URL: {result_url}")
+                else:
+                    print("  Image bulk mutation did not start.")
 
     # ── 2. Inventory update ──
     if args.inv_csv:
