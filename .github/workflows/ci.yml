@@ -18,6 +18,19 @@ jobs:
       - name: Compile all Python files
         run: python -m compileall -q .
 
+  python-tests:
+    name: Python unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r bulk_blog/requirements.txt
+      - name: Run pytest (bulk_blog)
+        run: python -m pytest bulk_blog/tests/ -v
+
   node-syntax:
     name: Node/Apps Script syntax check
     runs-on: ubuntu-latest

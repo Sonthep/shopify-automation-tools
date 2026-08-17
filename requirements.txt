@@ -10,6 +10,9 @@ pandas
 python-dotenv
 openpyxl
 
+# Automated tests (bulk_blog/tests/, etc.) — run with: pytest
+pytest
+
 # pdf_sourcing/, bulk_product/pdf/
 pypdf
 
