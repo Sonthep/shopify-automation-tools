@@ -25,6 +25,44 @@ HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
 
 LOCALE_TH = "th"
 
+EXISTING_ARTICLES_QUERY = """
+query BlogArticles($id: ID!, $cursor: String) {
+  blog(id: $id) {
+    articles(first: 250, after: $cursor) {
+      edges { node { id title } }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}
+"""
+
+
+def normalize_blog_gid(blog_gid: str) -> str:
+    blog_gid = str(blog_gid).strip()
+    if blog_gid.isdigit():
+        return f"gid://shopify/Blog/{blog_gid}"
+    return blog_gid
+
+
+def fetch_existing_titles(blog_gid: str) -> dict:
+    """Returns {title: article_id} for every article already on this blog.
+    Used to skip titles that were already created by a previous run."""
+    titles = {}
+    cursor = None
+    while True:
+        res = gql(API_URL, HEADERS, EXISTING_ARTICLES_QUERY, {"id": blog_gid, "cursor": cursor})
+        if not res or not res.get("data") or not res["data"].get("blog"):
+            print(f"[WARN] Could not fetch existing articles for blog {blog_gid} (duplicate check skipped for this blog)")
+            break
+        conn = res["data"]["blog"]["articles"]
+        for edge in conn["edges"]:
+            titles[edge["node"]["title"]] = edge["node"]["id"]
+        if conn["pageInfo"]["hasNextPage"]:
+            cursor = conn["pageInfo"]["endCursor"]
+        else:
+            break
+    return titles
+
 ARTICLE_CREATE_MUTATION = """
 mutation articleCreate($article: ArticleCreateInput!) {
   articleCreate(article: $article) {
@@ -128,10 +166,8 @@ def create_article(row: pd.Series) -> dict:
     if not blog_gid:
         return {"status": "error", "message": "No Blog GID provided"}
         
-    # Format GID just in case user provided only numbers
-    if str(blog_gid).isdigit():
-        blog_gid = f"gid://shopify/Blog/{blog_gid}"
-        
+    blog_gid = normalize_blog_gid(blog_gid)
+
     body = get_val(row, "Body") or ""
     author_name = get_val(row, "Author")
     
@@ -184,6 +220,8 @@ def create_article(row: pd.Series) -> dict:
 def main():
     parser = argparse.ArgumentParser(description="Bulk Create Shopify Articles (Blog Posts)")
     parser.add_argument("--csv", required=True, help="Path to input CSV file")
+    parser.add_argument("--allow-duplicates", action="store_true",
+                         help="Skip the existing-title check and create even if a matching title already exists on the blog")
     args = parser.parse_args()
 
     input_file = args.csv
@@ -193,22 +231,54 @@ def main():
 
     print(f"Reading {input_file}...")
     df = read_csv_auto(input_file)
-    
+
+    # ป้องกันสร้างซ้ำ: ดึงชื่อ article ที่มีอยู่แล้วของทุก blog ที่ปรากฏใน CSV ก่อนเริ่ม
+    existing_by_blog = {}
+    if not args.allow_duplicates:
+        blog_gids = set()
+        for _, row in df.iterrows():
+            bg = get_val(row, "Blog GID")
+            if bg:
+                blog_gids.add(normalize_blog_gid(bg))
+        for bg in blog_gids:
+            print(f"Checking existing articles on {bg}...")
+            existing_by_blog[bg] = fetch_existing_titles(bg)
+
     results = []
     success_count = 0
     error_count = 0
+    skip_count = 0
 
     for idx, row in df.iterrows():
         title = get_val(row, "Title")
         print(f"[{idx+1}/{len(df)}] Creating: {title}...", end=" ")
-        
+
+        if not args.allow_duplicates:
+            blog_gid = normalize_blog_gid(get_val(row, "Blog GID") or "")
+            existing_id = existing_by_blog.get(blog_gid, {}).get(title)
+            if existing_id:
+                print(f"⏭️  Skipped (already exists: {existing_id})")
+                skip_count += 1
+                results.append({
+                    "Title": title,
+                    "Status": "skipped",
+                    "Article ID": existing_id,
+                    "Message": "Already exists on blog (use --allow-duplicates to force)",
+                    "TH Translation": ""
+                })
+                continue
+
         res = create_article(row)
-        
+
         th_status = ""
         if res["status"] == "success":
             print(f"✅ {res['article_id']}")
             success_count += 1
-            
+
+            if not args.allow_duplicates:
+                blog_gid = normalize_blog_gid(get_val(row, "Blog GID") or "")
+                existing_by_blog.setdefault(blog_gid, {})[title] = res["article_id"]
+
             # ลงทะเบียน translation ภาษาไทย (ถ้ามีข้อมูลใน column Title_TH / Body_TH)
             title_th = get_val(row, "Title_TH") or ""
             body_th = get_val(row, "Body_TH") or ""
@@ -248,7 +318,7 @@ def main():
     pd.DataFrame(results).to_csv(out_file, index=False, encoding="utf-8-sig")
     
     print("\n" + "="*40)
-    print(f"Completed! Success: {success_count}, Errors: {error_count}")
+    print(f"Completed! Success: {success_count}, Skipped (duplicates): {skip_count}, Errors: {error_count}")
     print(f"Result log saved to: {out_file}")
     print("="*40)
 
