@@ -15,23 +15,15 @@ import sys
 import os
 import argparse
 import time
-import importlib.util
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(BASE_DIR)
-UTILS_PATH = os.path.join(ROOT_DIR, "bulk_product", "utils.py")
+import blog_utils
 
-spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
-utils = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(utils)
-
-make_headers = utils.make_headers
-gql = utils.gql
-API_URL = utils.API_URL
-read_csv_auto = utils.read_csv_auto
-get_val = utils.get_val
-
-HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
+gql = blog_utils.gql
+API_URL = blog_utils.API_URL
+HEADERS = blog_utils.HEADERS
+read_csv_auto = blog_utils.read_csv_auto
+get_val = blog_utils.get_val
+normalize_article_gid = blog_utils.normalize_article_gid
 
 ARTICLE_DELETE_MUTATION = """
 mutation articleDelete($id: ID!) {
@@ -41,13 +33,6 @@ mutation articleDelete($id: ID!) {
   }
 }
 """
-
-
-def normalize_article_gid(value: str) -> str:
-    value = str(value).strip()
-    if value.isdigit():
-        return f"gid://shopify/Article/{value}"
-    return value
 
 
 def delete_article(article_gid: str) -> dict:
@@ -109,7 +94,11 @@ def main():
         print(f"  {i}")
 
     if not args.yes:
-        confirm = input(f"\nType 'yes' to confirm deleting {len(ids)} article(s): ").strip().lower()
+        try:
+            confirm = input(f"\nType 'yes' to confirm deleting {len(ids)} article(s): ").strip().lower()
+        except EOFError:
+            print("\n[ERROR] No terminal input available to confirm. Re-run with --yes to skip the prompt.")
+            sys.exit(1)
         if confirm != "yes":
             print("Aborted.")
             return

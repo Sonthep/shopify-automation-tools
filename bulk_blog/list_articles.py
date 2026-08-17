@@ -12,71 +12,13 @@ Usage:
 """
 
 import sys
-import os
 import argparse
-import importlib.util
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(BASE_DIR)
-UTILS_PATH = os.path.join(ROOT_DIR, "bulk_product", "utils.py")
+import blog_utils
 
-spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
-utils = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(utils)
-
-make_headers = utils.make_headers
-gql = utils.gql
-API_URL = utils.API_URL
-
-HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
-
-BLOGS_QUERY = """
-{ blogs(first: 50) { edges { node { id title } } } }
-"""
-
-ARTICLES_QUERY = """
-query BlogArticles($id: ID!, $cursor: String) {
-  blog(id: $id) {
-    title
-    articles(first: 250, after: $cursor) {
-      edges { node { id title isPublished createdAt } }
-      pageInfo { hasNextPage endCursor }
-    }
-  }
-}
-"""
-
-
-def normalize_blog_gid(value: str) -> str:
-    value = str(value).strip()
-    if value.isdigit():
-        return f"gid://shopify/Blog/{value}"
-    return value
-
-
-def fetch_articles(blog_gid: str):
-    """Returns (blog_title, [article_node, ...]) with pagination handled."""
-    articles = []
-    cursor = None
-    blog_title = None
-
-    while True:
-        res = gql(API_URL, HEADERS, ARTICLES_QUERY, {"id": blog_gid, "cursor": cursor})
-        if not res or not res.get("data") or not res["data"].get("blog"):
-            print(f"[ERROR] Could not fetch blog {blog_gid}")
-            break
-
-        blog = res["data"]["blog"]
-        blog_title = blog["title"]
-        conn = blog["articles"]
-        articles.extend(edge["node"] for edge in conn["edges"])
-
-        if conn["pageInfo"]["hasNextPage"]:
-            cursor = conn["pageInfo"]["endCursor"]
-        else:
-            break
-
-    return blog_title, articles
+normalize_blog_gid = blog_utils.normalize_blog_gid
+fetch_blog_articles = blog_utils.fetch_blog_articles
+fetch_known_blogs = blog_utils.fetch_known_blogs
 
 
 def main():
@@ -87,17 +29,17 @@ def main():
     if args.blog:
         blog_gids = [normalize_blog_gid(args.blog)]
     else:
-        res = gql(API_URL, HEADERS, BLOGS_QUERY)
-        if not res:
+        known_blogs = fetch_known_blogs()
+        if not known_blogs:
             print("[ERROR] Could not fetch blogs")
             sys.exit(1)
-        blog_gids = [edge["node"]["id"] for edge in res["data"]["blogs"]["edges"]]
+        blog_gids = list(known_blogs.keys())
 
     total = 0
     total_dupes = 0
 
     for blog_gid in blog_gids:
-        blog_title, articles = fetch_articles(blog_gid)
+        blog_title, articles = fetch_blog_articles(blog_gid)
         print(f"\n=== Blog: {blog_title or '?'} ({blog_gid}) — {len(articles)} article(s) ===")
 
         title_counts = {}

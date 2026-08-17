@@ -3,65 +3,19 @@ import os
 import argparse
 import pandas as pd
 import time
-import importlib.util
 
-# Load utils from bulk_product
+import blog_utils
+
+gql = blog_utils.gql
+API_URL = blog_utils.API_URL
+HEADERS = blog_utils.HEADERS
+read_csv_auto = blog_utils.read_csv_auto
+get_val = blog_utils.get_val
+normalize_blog_gid = blog_utils.normalize_blog_gid
+fetch_existing_titles = blog_utils.fetch_existing_titles
+register_thai_translation = blog_utils.register_thai_translation
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(BASE_DIR)
-UTILS_PATH = os.path.join(ROOT_DIR, "bulk_product", "utils.py")
-
-spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
-utils = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(utils)
-
-make_headers = utils.make_headers
-gql = utils.gql
-API_URL = utils.API_URL
-read_csv_auto = utils.read_csv_auto
-get_val = utils.get_val
-
-# กำหนด Token ที่จะใช้ดึงจาก .env
-HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
-
-LOCALE_TH = "th"
-
-EXISTING_ARTICLES_QUERY = """
-query BlogArticles($id: ID!, $cursor: String) {
-  blog(id: $id) {
-    articles(first: 250, after: $cursor) {
-      edges { node { id title } }
-      pageInfo { hasNextPage endCursor }
-    }
-  }
-}
-"""
-
-
-def normalize_blog_gid(blog_gid: str) -> str:
-    blog_gid = str(blog_gid).strip()
-    if blog_gid.isdigit():
-        return f"gid://shopify/Blog/{blog_gid}"
-    return blog_gid
-
-
-def fetch_existing_titles(blog_gid: str) -> dict:
-    """Returns {title: article_id} for every article already on this blog.
-    Used to skip titles that were already created by a previous run."""
-    titles = {}
-    cursor = None
-    while True:
-        res = gql(API_URL, HEADERS, EXISTING_ARTICLES_QUERY, {"id": blog_gid, "cursor": cursor})
-        if not res or not res.get("data") or not res["data"].get("blog"):
-            print(f"[WARN] Could not fetch existing articles for blog {blog_gid} (duplicate check skipped for this blog)")
-            break
-        conn = res["data"]["blog"]["articles"]
-        for edge in conn["edges"]:
-            titles[edge["node"]["title"]] = edge["node"]["id"]
-        if conn["pageInfo"]["hasNextPage"]:
-            cursor = conn["pageInfo"]["endCursor"]
-        else:
-            break
-    return titles
 
 ARTICLE_CREATE_MUTATION = """
 mutation articleCreate($article: ArticleCreateInput!) {
@@ -80,81 +34,6 @@ mutation articleCreate($article: ArticleCreateInput!) {
   }
 }
 """
-
-ARTICLE_GET_DIGESTS = """
-query GetArticleDigests($id: ID!) {
-  translatableResource(resourceId: $id) {
-    translatableContent {
-      key
-      digest
-    }
-  }
-}
-"""
-
-ARTICLE_REGISTER_TRANSLATION = """
-mutation RegisterTranslation($resourceId: ID!, $translations: [TranslationInput!]!) {
-  translationsRegister(resourceId: $resourceId, translations: $translations) {
-    translations {
-      key
-      locale
-    }
-    userErrors {
-      field
-      message
-    }
-  }
-}
-"""
-
-def register_thai_translation(article_id: str, title_th: str, body_th: str) -> dict:
-    """ลงทะเบียน translation ภาษาไทยสำหรับ article ที่สร้างแล้ว"""
-    # ดึง digest ของ article ก่อน
-    res_digest = gql(API_URL, HEADERS, ARTICLE_GET_DIGESTS, {"id": article_id})
-    if not res_digest:
-        return {"status": "error", "message": "ไม่สามารถดึง digest ของ article ได้"}
-    
-    content_list = (
-        res_digest.get("data", {})
-        .get("translatableResource", {})
-        .get("translatableContent", [])
-    )
-    digest_map = {item["key"]: item["digest"] for item in content_list}
-    
-    translations = []
-    if title_th and "title" in digest_map:
-        translations.append({
-            "key": "title",
-            "value": title_th,
-            "locale": LOCALE_TH,
-            "translatableContentDigest": digest_map["title"]
-        })
-    if body_th and "body_html" in digest_map:
-        translations.append({
-            "key": "body_html",
-            "value": body_th,
-            "locale": LOCALE_TH,
-            "translatableContentDigest": digest_map["body_html"]
-        })
-    
-    if not translations:
-        return {"status": "skipped", "message": "ไม่มีข้อมูลภาษาไทยหรือไม่พบ digest"}
-    
-    res_reg = gql(API_URL, HEADERS, ARTICLE_REGISTER_TRANSLATION, {
-        "resourceId": article_id,
-        "translations": translations
-    })
-    if not res_reg:
-        return {"status": "error", "message": "GraphQL request failed (translation)"}
-    
-    reg_data = res_reg.get("data", {}).get("translationsRegister", {})
-    reg_errors = reg_data.get("userErrors", [])
-    if reg_errors:
-        err_msg = "; ".join([f"{e.get('field', [])}: {e.get('message')}" for e in reg_errors])
-        return {"status": "error", "message": err_msg}
-    
-    keys_registered = [t["key"] for t in reg_data.get("translations", [])]
-    return {"status": "success", "message": f"Registered TH keys: {keys_registered}"}
 
 
 def create_article(row: pd.Series) -> dict:
@@ -188,7 +67,12 @@ def create_article(row: pd.Series) -> dict:
         article_input["author"] = {"name": author_name}
     if tags:
         article_input["tags"] = tags
-    
+
+    # Theme template ที่ใช้แสดงผล article (dropdown "Theme template" ในหน้า admin)
+    theme_template = get_val(row, "Theme Template")
+    if theme_template:
+        article_input["templateSuffix"] = theme_template
+
     # รองรับ Image URL + Alt text (featured image ของ article)
     image_url = get_val(row, "Image URL") or ""
     image_alt = get_val(row, "Image Alt") or ""
@@ -196,7 +80,19 @@ def create_article(row: pd.Series) -> dict:
         article_input["image"] = {"url": image_url}
         if image_alt:
             article_input["image"]["altText"] = image_alt
-        
+
+    # SEO: "Page title" / "Meta description" ในหน้า admin — Article ไม่มี field "seo" ตรงๆ
+    # ต้องตั้งผ่าน metafield legacy namespace "global" (ยืนยันจาก article ที่ตั้งค่าไว้จริงในร้าน)
+    seo_title = get_val(row, "SEO Title")
+    seo_desc = get_val(row, "SEO Description")
+    seo_metafields = []
+    if seo_title:
+        seo_metafields.append({"namespace": "global", "key": "title_tag", "value": seo_title, "type": "string"})
+    if seo_desc:
+        seo_metafields.append({"namespace": "global", "key": "description_tag", "value": seo_desc, "type": "string"})
+    if seo_metafields:
+        article_input["metafields"] = seo_metafields
+
     variables = {"article": article_input}
     
     res = gql(API_URL, HEADERS, ARTICLE_CREATE_MUTATION, variables)
@@ -251,10 +147,10 @@ def main():
 
     for idx, row in df.iterrows():
         title = get_val(row, "Title")
+        blog_gid = normalize_blog_gid(get_val(row, "Blog GID") or "")
         print(f"[{idx+1}/{len(df)}] Creating: {title}...", end=" ")
 
         if not args.allow_duplicates:
-            blog_gid = normalize_blog_gid(get_val(row, "Blog GID") or "")
             existing_id = existing_by_blog.get(blog_gid, {}).get(title)
             if existing_id:
                 print(f"⏭️  Skipped (already exists: {existing_id})")
@@ -276,7 +172,6 @@ def main():
             success_count += 1
 
             if not args.allow_duplicates:
-                blog_gid = normalize_blog_gid(get_val(row, "Blog GID") or "")
                 existing_by_blog.setdefault(blog_gid, {})[title] = res["article_id"]
 
             # ลงทะเบียน translation ภาษาไทย (ถ้ามีข้อมูลใน column Title_TH / Body_TH)

@@ -19,72 +19,18 @@ import sys
 import os
 import re
 import argparse
-import importlib.util
 import requests
-import pandas as pd
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(BASE_DIR)
-UTILS_PATH = os.path.join(ROOT_DIR, "bulk_product", "utils.py")
+import blog_utils
 
-spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
-utils = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(utils)
-
-make_headers = utils.make_headers
-gql = utils.gql
-API_URL = utils.API_URL
-read_csv_auto = utils.read_csv_auto
-get_val = utils.get_val
-
-HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
+read_csv_auto = blog_utils.read_csv_auto
+get_val = blog_utils.get_val
+normalize_blog_gid = blog_utils.normalize_blog_gid
+fetch_known_blogs = blog_utils.fetch_known_blogs
+fetch_existing_titles = blog_utils.fetch_existing_titles
 
 IMG_TAG_RE = re.compile(r'<img\b[^>]*\bsrc=["\']([^"\']+)["\']', re.IGNORECASE)
 VALID_PUBLISHED_VALUES = {"true", "false", "1", "0", "yes", "no", "y", "n", ""}
-
-BLOGS_QUERY = "{ blogs(first: 50) { edges { node { id title } } } }"
-
-EXISTING_ARTICLES_QUERY = """
-query BlogArticles($id: ID!, $cursor: String) {
-  blog(id: $id) {
-    articles(first: 250, after: $cursor) {
-      edges { node { id title } }
-      pageInfo { hasNextPage endCursor }
-    }
-  }
-}
-"""
-
-
-def normalize_blog_gid(value: str) -> str:
-    value = str(value).strip()
-    if value.isdigit():
-        return f"gid://shopify/Blog/{value}"
-    return value
-
-
-def fetch_known_blogs() -> dict:
-    """Returns {blog_gid: title}."""
-    res = gql(API_URL, HEADERS, BLOGS_QUERY)
-    if not res:
-        return {}
-    return {e["node"]["id"]: e["node"]["title"] for e in res["data"]["blogs"]["edges"]}
-
-
-def fetch_existing_titles(blog_gid: str) -> set:
-    titles = set()
-    cursor = None
-    while True:
-        res = gql(API_URL, HEADERS, EXISTING_ARTICLES_QUERY, {"id": blog_gid, "cursor": cursor})
-        if not res or not res.get("data") or not res["data"].get("blog"):
-            break
-        conn = res["data"]["blog"]["articles"]
-        titles.update(e["node"]["title"] for e in conn["edges"])
-        if conn["pageInfo"]["hasNextPage"]:
-            cursor = conn["pageInfo"]["endCursor"]
-        else:
-            break
-    return titles
 
 
 def url_is_reachable(url: str, timeout: int = 10) -> tuple:
@@ -106,9 +52,9 @@ def url_is_reachable(url: str, timeout: int = 10) -> tuple:
 
 
 def extract_body_image_urls(html: str) -> list:
-    if not html or (isinstance(html, float)):
+    if not html:
         return []
-    return list(dict.fromkeys(IMG_TAG_RE.findall(str(html))))
+    return list(dict.fromkeys(IMG_TAG_RE.findall(html)))
 
 
 def main():
@@ -144,24 +90,28 @@ def main():
             errors.append((line, "No Title"))
             continue
 
-        if title in seen_titles_in_csv:
-            errors.append((line, f"Duplicate title within this CSV (also row {seen_titles_in_csv[title]}): '{title}'"))
-        else:
-            seen_titles_in_csv[title] = line
-
         blog_gid_raw = get_val(row, "Blog GID")
-        if not blog_gid_raw:
-            errors.append((line, f"'{title}': No Blog GID"))
+        blog_gid = normalize_blog_gid(blog_gid_raw) if blog_gid_raw else None
+
+        # Duplicate check is scoped per-blog: create_articles.py's own dedupe guard is
+        # per-blog too (a title reused across two different blogs is valid), so flagging
+        # it globally here would block CSVs that create_articles.py would happily accept.
+        dupe_key = (blog_gid, title)
+        if dupe_key in seen_titles_in_csv:
+            errors.append((line, f"Duplicate title within this CSV for the same blog (also row {seen_titles_in_csv[dupe_key]}): '{title}'"))
         else:
-            blog_gid = normalize_blog_gid(blog_gid_raw)
-            if blog_gid not in known_blogs:
-                errors.append((line, f"'{title}': Blog GID {blog_gid} does not match any known blog"))
-            else:
-                if blog_gid not in existing_by_blog:
-                    print(f"Checking existing articles on {known_blogs[blog_gid]} ({blog_gid})...")
-                    existing_by_blog[blog_gid] = fetch_existing_titles(blog_gid)
-                if title in existing_by_blog[blog_gid]:
-                    warnings.append((line, f"'{title}': already exists on {known_blogs[blog_gid]} (create_articles.py will skip it)"))
+            seen_titles_in_csv[dupe_key] = line
+
+        if not blog_gid:
+            errors.append((line, f"'{title}': No Blog GID"))
+        elif blog_gid not in known_blogs:
+            errors.append((line, f"'{title}': Blog GID {blog_gid} does not match any known blog"))
+        else:
+            if blog_gid not in existing_by_blog:
+                print(f"Checking existing articles on {known_blogs[blog_gid]} ({blog_gid})...")
+                existing_by_blog[blog_gid] = fetch_existing_titles(blog_gid)
+            if title in existing_by_blog[blog_gid]:
+                warnings.append((line, f"'{title}': already exists on {known_blogs[blog_gid]} (create_articles.py will skip it)"))
 
         published_raw = str(get_val(row, "Published") or "").strip().lower()
         if published_raw not in VALID_PUBLISHED_VALUES:

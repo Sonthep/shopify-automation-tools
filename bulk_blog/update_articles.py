@@ -8,11 +8,13 @@ Avoids the delete+recreate cycle for fixing content that's already live.
 CSV format (only "Article ID" is required — leave any other cell blank
 to leave that field untouched on Shopify):
     Article ID, Title, Body, Author, Tags, Published, Image URL, Image Alt,
-    SEO Title, SEO Description, Title_TH, Body_TH
+    Theme Template, SEO Title, SEO Description, Title_TH, Body_TH
 
-  - Article ID : numeric ID or full GID (gid://shopify/Article/...)
-  - Tags       : comma-separated, REPLACES the article's entire tag list
-  - Published  : true/false/yes/no/1/0 — leave blank to leave isPublished unchanged
+  - Article ID     : numeric ID or full GID (gid://shopify/Article/...)
+  - Tags           : comma-separated, REPLACES the article's entire tag list
+  - Published      : true/false/yes/no/1/0 — leave blank to leave isPublished unchanged
+  - Theme Template  : the "Theme template" dropdown in admin (Shopify's templateSuffix,
+                       e.g. "premium" for templates/article.premium.liquid)
   - Title_TH / Body_TH : re-registers the Thai translation for that article
 
 Usage:
@@ -24,26 +26,19 @@ import sys
 import os
 import argparse
 import time
-import importlib.util
 import pandas as pd
 
+import blog_utils
+
+gql = blog_utils.gql
+API_URL = blog_utils.API_URL
+HEADERS = blog_utils.HEADERS
+read_csv_auto = blog_utils.read_csv_auto
+get_val = blog_utils.get_val
+normalize_article_gid = blog_utils.normalize_article_gid
+register_thai_translation = blog_utils.register_thai_translation
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(BASE_DIR)
-UTILS_PATH = os.path.join(ROOT_DIR, "bulk_product", "utils.py")
-
-spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
-utils = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(utils)
-
-make_headers = utils.make_headers
-gql = utils.gql
-API_URL = utils.API_URL
-read_csv_auto = utils.read_csv_auto
-get_val = utils.get_val
-
-HEADERS = make_headers("SHOPIFY_ACCESS_TOKEN_CREATE_PRODUCT")
-
-LOCALE_TH = "th"
 
 ARTICLE_UPDATE_MUTATION = """
 mutation articleUpdate($id: ID!, $article: ArticleUpdateInput!) {
@@ -53,73 +48,6 @@ mutation articleUpdate($id: ID!, $article: ArticleUpdateInput!) {
   }
 }
 """
-
-ARTICLE_GET_DIGESTS = """
-query GetArticleDigests($id: ID!) {
-  translatableResource(resourceId: $id) {
-    translatableContent { key digest }
-  }
-}
-"""
-
-ARTICLE_REGISTER_TRANSLATION = """
-mutation RegisterTranslation($resourceId: ID!, $translations: [TranslationInput!]!) {
-  translationsRegister(resourceId: $resourceId, translations: $translations) {
-    translations { key locale }
-    userErrors { field message }
-  }
-}
-"""
-
-
-def normalize_article_gid(value: str) -> str:
-    value = str(value).strip()
-    if value.isdigit():
-        return f"gid://shopify/Article/{value}"
-    return value
-
-
-def register_thai_translation(article_id: str, title_th: str, body_th: str) -> dict:
-    res_digest = gql(API_URL, HEADERS, ARTICLE_GET_DIGESTS, {"id": article_id})
-    if not res_digest:
-        return {"status": "error", "message": "Could not fetch article digests"}
-
-    content_list = (
-        res_digest.get("data", {})
-        .get("translatableResource", {})
-        .get("translatableContent", [])
-    )
-    digest_map = {item["key"]: item["digest"] for item in content_list}
-
-    translations = []
-    if title_th and "title" in digest_map:
-        translations.append({
-            "key": "title", "value": title_th, "locale": LOCALE_TH,
-            "translatableContentDigest": digest_map["title"]
-        })
-    if body_th and "body_html" in digest_map:
-        translations.append({
-            "key": "body_html", "value": body_th, "locale": LOCALE_TH,
-            "translatableContentDigest": digest_map["body_html"]
-        })
-
-    if not translations:
-        return {"status": "skipped", "message": "No TH content or digest not found"}
-
-    res_reg = gql(API_URL, HEADERS, ARTICLE_REGISTER_TRANSLATION, {
-        "resourceId": article_id,
-        "translations": translations
-    })
-    if not res_reg:
-        return {"status": "error", "message": "GraphQL request failed (translation)"}
-
-    reg_data = res_reg.get("data", {}).get("translationsRegister", {})
-    reg_errors = reg_data.get("userErrors", [])
-    if reg_errors:
-        return {"status": "error", "message": "; ".join(f"{e.get('field')}: {e.get('message')}" for e in reg_errors)}
-
-    keys_registered = [t["key"] for t in reg_data.get("translations", [])]
-    return {"status": "success", "message": f"Registered TH keys: {keys_registered}"}
 
 
 def build_update_input(row: pd.Series) -> dict:
@@ -140,7 +68,11 @@ def build_update_input(row: pd.Series) -> dict:
 
     tags_str = get_val(row, "Tags")
     if tags_str:
-        article["tags"] = [t.strip() for t in tags_str.split(",") if t.strip()]
+        parsed_tags = [t.strip() for t in tags_str.split(",") if t.strip()]
+        if parsed_tags:
+            article["tags"] = parsed_tags
+        else:
+            print(f"   [WARN] Tags cell '{tags_str}' parsed to no tags — leaving existing tags untouched")
 
     published_raw = get_val(row, "Published")
     if published_raw is not None and str(published_raw).strip() != "":
@@ -153,15 +85,21 @@ def build_update_input(row: pd.Series) -> dict:
         if image_alt:
             article["image"]["altText"] = image_alt
 
+    theme_template = get_val(row, "Theme Template")
+    if theme_template:
+        article["templateSuffix"] = theme_template
+
+    # SEO: "Page title" / "Meta description" ในหน้า admin — Article ไม่มี field "seo" ตรงๆ
+    # ต้องตั้งผ่าน metafield legacy namespace "global" (ยืนยันจาก article ที่ตั้งค่าไว้จริงในร้าน)
     seo_title = get_val(row, "SEO Title")
     seo_desc = get_val(row, "SEO Description")
-    if seo_title or seo_desc:
-        seo = {}
-        if seo_title:
-            seo["title"] = seo_title
-        if seo_desc:
-            seo["description"] = seo_desc
-        article["seo"] = seo
+    seo_metafields = []
+    if seo_title:
+        seo_metafields.append({"namespace": "global", "key": "title_tag", "value": seo_title, "type": "string"})
+    if seo_desc:
+        seo_metafields.append({"namespace": "global", "key": "description_tag", "value": seo_desc, "type": "string"})
+    if seo_metafields:
+        article["metafields"] = seo_metafields
 
     return article
 
