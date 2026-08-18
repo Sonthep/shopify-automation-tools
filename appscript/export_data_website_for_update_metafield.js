@@ -94,7 +94,7 @@ function exportDataWebsiteForUpdateMetafieldTest(limit) {
     return resData.data.products.edges.map(e => e.node);
   }
 
-  const WINSPEED_FILE_ID = "1Z48qT3LXYozhlh_ZBHzn9e4x1kfX_bOLHQtaksj-ZXU";
+  const WINSPEED_FILE_ID = "1-7ap--3aphttTb8M0cXYvVYmRGtZQKRxoUW3nvwuUNA";
 
   // ลำดับคอลัมน์คงที่ A-M: คอลัมน์ที่มี key ดึงจากข้อมูล Shopify, ที่ไม่มี key คือสูตร (เติมทีหลังด้วย applyWinspeedFormulas)
   const COLUMNS = [
@@ -140,7 +140,7 @@ function exportDataWebsiteForUpdateMetafieldTest(limit) {
     }));
   }
 
-  // เติมสูตร XLOOKUP เทียบกับชีต "Main Product" (Winspeed) + สูตรเช็คสถานะ column M
+  // เติมสูตร XLOOKUP เทียบกับชีต "Active" (Winspeed) + สูตรเช็คสถานะ column M
   // อ้างอิงตำแหน่งคอลัมน์คงที่ตาม COLUMNS ด้านบน (A, E-M)
   function applyWinspeedFormulas(sheet, numRows) {
     if (numRows <= 0) return;
@@ -148,10 +148,10 @@ function exportDataWebsiteForUpdateMetafieldTest(limit) {
 
     for (let i = 0; i < numRows; i++) {
       const r = i + 2;
-      mainCat.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!A:A"), IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!L:L"))`]);
-      subCat.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!A:A"), IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!M:M"))`]);
-      productType.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!A:A"), IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!J:J"))`]);
-      powerType.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!A:A"), IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!K:K"))`]);
+      mainCat.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Active!B:B"), IMPORTRANGE("${WINSPEED_FILE_ID}","Active!R:R"))`]);
+      subCat.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Active!B:B"), IMPORTRANGE("${WINSPEED_FILE_ID}","Active!S:S"))`]);
+      productType.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Active!B:B"), IMPORTRANGE("${WINSPEED_FILE_ID}","Active!T:T"))`]);
+      powerType.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Active!B:B"), IMPORTRANGE("${WINSPEED_FILE_ID}","Active!U:U"))`]);
       checkUpdate.push([`=IF(COUNTA(E${r}:L${r})=0,"",IF(AND(LOWER(TRIM(E${r}))=LOWER(TRIM(F${r})),LOWER(TRIM(G${r}))=LOWER(TRIM(H${r})),LOWER(TRIM(I${r}))=LOWER(TRIM(J${r})),LOWER(TRIM(K${r}))=LOWER(TRIM(L${r}))),"OK","UPDATE"))`]);
     }
 
@@ -207,7 +207,7 @@ function exportDataWebsiteForUpdateMetafield() {
   const EXPORT_SHEET_NAME = "data";
   const LOG_SHEET_NAME = "Logrun script";
   const POLL_INTERVAL_MS = 10000;
-  const WINSPEED_FILE_ID = "1Z48qT3LXYozhlh_ZBHzn9e4x1kfX_bOLHQtaksj-ZXU";
+  const WINSPEED_FILE_ID = "1-7ap--3aphttTb8M0cXYvVYmRGtZQKRxoUW3nvwuUNA";
 
   // ลำดับคอลัมน์คงที่ A-M: คอลัมน์ที่มี key ดึงจากข้อมูล Shopify, ที่ไม่มี key คือสูตร (เติมทีหลังด้วย applyWinspeedFormulas)
   const COLUMNS = [
@@ -348,7 +348,7 @@ mutation BulkQuery($query: String!) {
     }
   }
 
-  // เติมสูตร XLOOKUP เทียบกับชีต "Main Product" (Winspeed) + สูตรเช็คสถานะ column M
+  // เติมสูตร XLOOKUP เทียบกับชีต "Active" (Winspeed) + สูตรเช็คสถานะ column M
   // อ้างอิงตำแหน่งคอลัมน์คงที่ตาม COLUMNS ด้านบน (A, E-M)
   function applyWinspeedFormulas(sheet, numRows) {
     if (numRows <= 0) return;
@@ -356,10 +356,10 @@ mutation BulkQuery($query: String!) {
 
     for (let i = 0; i < numRows; i++) {
       const r = i + 2;
-      mainCat.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!A:A"), IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!L:L"))`]);
-      subCat.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!A:A"), IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!M:M"))`]);
-      productType.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!A:A"), IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!J:J"))`]);
-      powerType.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!A:A"), IMPORTRANGE("${WINSPEED_FILE_ID}","Main Product!K:K"))`]);
+      mainCat.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Active!B:B"), IMPORTRANGE("${WINSPEED_FILE_ID}","Active!R:R"))`]);
+      subCat.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Active!B:B"), IMPORTRANGE("${WINSPEED_FILE_ID}","Active!S:S"))`]);
+      productType.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Active!B:B"), IMPORTRANGE("${WINSPEED_FILE_ID}","Active!T:T"))`]);
+      powerType.push([`=XLOOKUP(A${r}, IMPORTRANGE("${WINSPEED_FILE_ID}","Active!B:B"), IMPORTRANGE("${WINSPEED_FILE_ID}","Active!U:U"))`]);
       checkUpdate.push([`=IF(COUNTA(E${r}:L${r})=0,"",IF(AND(LOWER(TRIM(E${r}))=LOWER(TRIM(F${r})),LOWER(TRIM(G${r}))=LOWER(TRIM(H${r})),LOWER(TRIM(I${r}))=LOWER(TRIM(J${r})),LOWER(TRIM(K${r}))=LOWER(TRIM(L${r}))),"OK","UPDATE"))`]);
     }
 
