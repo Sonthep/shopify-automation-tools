@@ -106,6 +106,12 @@ function updateMetafieldFromWinspeed(sheetName) {
     return map;
   }
 
+  // Winspeed เก็บค่าเป็นตัวพิมพ์ใหญ่ล้วน (เช่น "STAINLESS STEEL FABRICATION")
+  // แปลงเป็น Title Case ก่อนส่งเข้า Shopify (เช่น "Stainless Steel Fabrication")
+  function toTitleCase(str) {
+    return String(str).toLowerCase().replace(/\b\w/g, ch => ch.toUpperCase());
+  }
+
   function updateProduct(productGid, mainCat, subCat, partType, partTypeType, powerType, powerTypeType) {
     const input = { id: productGid };
     if (mainCat) input.productType = mainCat;
@@ -207,10 +213,10 @@ function updateMetafieldFromWinspeed(sheetName) {
       continue;
     }
 
-    const mainCat = String(row[idx.mainCatWinspeed] || "").trim();
-    const subCat = String(row[idx.subCatWinspeed] || "").trim();
-    const productType = String(row[idx.productTypeWinspeed] || "").trim();
-    const powerType = String(row[idx.powerTypeWinspeed] || "").trim();
+    const mainCat = toTitleCase(String(row[idx.mainCatWinspeed] || "").trim());
+    const subCat = toTitleCase(String(row[idx.subCatWinspeed] || "").trim());
+    const productType = toTitleCase(String(row[idx.productTypeWinspeed] || "").trim());
+    const powerType = toTitleCase(String(row[idx.powerTypeWinspeed] || "").trim());
 
     if (!mainCat && !subCat && !productType && !powerType) {
       statusUpdates[i] = ["⏭️ ข้าม (ไม่มีค่า winspeed ให้ใช้อัปเดต)"];
