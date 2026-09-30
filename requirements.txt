@@ -21,7 +21,7 @@ beautifulsoup4
 
 # download/, bulk_product/images/ (image processing)
 Pillow
-rembg
+rembg[cpu]
 
 # scraper/ (browser automation, YouTube)
 undetected-chromedriver
