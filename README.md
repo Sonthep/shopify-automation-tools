@@ -1,4 +1,25 @@
-# shopify-automation-tools
+# Shopify Automation Tools
+
+Shopify operations tooling for product data, media, collections, menus, and Google Sheets synchronization.
+
+**Focus:** E-commerce automation · Python · Google Apps Script  
+**ภาษาไทย:** เครื่องมือช่วยจัดการข้อมูลสินค้า Shopify และเชื่อมงานระหว่างร้านค้าออนไลน์กับ Google Sheets
+
+## Portfolio overview
+
+| Workflow | Source | Engineering focus |
+| --- | --- | --- |
+| Bulk catalog maintenance | [bulk_product/](bulk_product/) | Product, metafield, collection, price, and media operations |
+| Spreadsheet integration | [appscript/](appscript/) | Google Apps Script workflows for product, inventory, and price data |
+| PDF preparation | [pdf_sourcing/](pdf_sourcing/) | Local document classification and SKU matching |
+| Store navigation and content | [menu/](menu/), [bulk_blog/](bulk_blog/) | API-driven content maintenance |
+| Shared API access | [shopify_client.py](shopify_client.py) | Token handling, throttling retries, mutation logging, and dry-run support |
+
+These workflows show the implementation scope. No time-saving percentages, sales improvements, or catalog-scale benchmarks are claimed.
+
+The technical guide below documents operational behavior and limitations. Apps Script runs in Google's runtime separately from the Python and Node tools.
+
+## Technical guide
 
 ชุด scripts สำหรับจัดการ Shopify store ผ่าน Admin API — อัปเดต product, จัดการรูป/PDF,
 sync กับ Google Sheets, และจัดการเมนู/บล็อก/collection
@@ -10,7 +31,6 @@ sync กับ Google Sheets, และจัดการเมนู/บล็�
 ```
 shopify-automation-tools/
 ├── .env                      # API tokens (ไม่ commit)
-├── .env.example              # Template สำหรับ setup ใหม่
 ├── shopify_client.py         # Shared Shopify API client (gql, throttle retry, token refresh)
 ├── gen_token.py              # ขอ Admin API token ใหม่ (Client Credentials)
 ├── package.json
@@ -75,7 +95,8 @@ export product ไป Google Sheet (`export_products_to_sheet.py`)
 ### 1. Environment Variables
 
 ```bash
-cp .env.example .env
+# Create a local .env file; no root .env.example is currently tracked
+# Use the variable names below and inspect the script you intend to run.
 ```
 
 ```env
