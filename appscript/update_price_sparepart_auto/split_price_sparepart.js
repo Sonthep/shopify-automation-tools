@@ -132,13 +132,12 @@ function splitPriceSparepartSpreadsheetApp_(limitRows) {
     if (key === "" && goodCode === "") continue;
 
     const priceWeb = parseFloat(priceWebRaw) || 0;
-    const isKit2 = goodCode.indexOf("KIT2") !== -1;
     const gidData = gidLookup.get(key);
     let productGid = "", variantGid = "";
     if (gidData) { productGid = gidData.productGid; variantGid = gidData.variantGid; }
     else missingGid++;
 
-    if (priceWeb === 0 || isKit2) {
+    if (priceWeb === 0) {
       const r = noDiscountRows.length + 1;
       noDiscountRows.push([goodId, goodCodeRaw, originalPrice, "=VLOOKUP(A" + r + ",'price website'!A:E,5,false)", "=C" + r + "=D" + r, productGid, variantGid]);
       noCount++;
@@ -518,9 +517,6 @@ function splitPriceSparepart(limitRows) {
       const priceWeb =
         spsParseNumber_(priceWebRaw);
 
-      const isKit2 =
-        goodCode.indexOf("KIT2") !== -1;
-
       const gidData =
         gidLookup.get(goodIdKey);
 
@@ -537,10 +533,9 @@ function splitPriceSparepart(limitRows) {
         missingGidCount++;
       }
 
-      // D = 0 หรือ GoodCode มี KIT2
+      // D = 0 → ไม่มีส่วนลด
       if (
-        priceWeb === 0 ||
-        isKit2
+        priceWeb === 0
       ) {
         const r = noDiscountRows.length + 1;
         noDiscountRows.push([
